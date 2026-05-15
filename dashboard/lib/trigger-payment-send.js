@@ -1,4 +1,4 @@
-const DEFAULT_WEBHOOK_URL = 'https://n8n.growleadpro.com/webhook/yassmin-payment-confirm-now';
+const DEFAULT_WEBHOOK_URL = 'https://n8n.growleadpro.com/webhook/yassmin-send-payment';
 const WEBHOOK_URL = (process.env.N8N_PAYMENT_SEND_WEBHOOK_URL || DEFAULT_WEBHOOK_URL).trim();
 const WEBHOOK_SECRET = process.env.N8N_WEBHOOK_SECRET || '';
 
@@ -23,7 +23,7 @@ function n8nFailureMessage(data, status) {
   const hint = String(data?.hint || '').trim();
   if (status === 404 || /not registered/i.test(msg)) {
     return (
-      'workflow إرسال الدفع غير مفعّل في n8n — افتحي «Yassmin — إرسال تأكيد الدفع فوراً» وفعّلي Active (أخضر)، ثم تأكدي أن Production URL ينتهي بـ yassmin-payment-confirm-now'
+      'workflow إرسال الدفع غير مفعّل في n8n — فعّلي workflow على المسار yassmin-send-payment (زر «إرسال الآن» يعمل الآن من Vercel مباشرة بدون n8n)'
     );
   }
   if (msg) return hint ? `${msg} (${hint})` : msg;

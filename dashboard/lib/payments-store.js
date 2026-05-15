@@ -18,6 +18,15 @@ async function updatePaymentDone(timestamp, done, options) {
   return activeStore().updatePaymentDone(timestamp, done, options);
 }
 
+async function updatePaymentWhatsappStatus(timestamp, fields) {
+  if (!useSupabase()) {
+    const err = new Error('supabase_required_for_whatsapp_send');
+    err.code = 'CONFIG';
+    throw err;
+  }
+  return supabaseStore.updatePaymentWhatsappStatus(timestamp, fields);
+}
+
 async function createPayment(body) {
   if (!useSupabase()) {
     const err = new Error('supabase_required_for_public_form');
@@ -35,6 +44,7 @@ async function listProducts() {
 module.exports = {
   listPayments,
   updatePaymentDone,
+  updatePaymentWhatsappStatus,
   createPayment,
   listProducts,
   readPaymentSheet: () =>

@@ -184,6 +184,48 @@ async function updatePaymentDone(formTimestamp, done, options = {}) {
   return listPayments();
 }
 
+async function updatePaymentWhatsappStatus(formTimestamp, fields) {
+  const key = norm(formTimestamp);
+  const patch = {};
+  if (fields.whatsapp_status !== undefined) {
+    patch.whatsapp_status = norm(fields.whatsapp_status) || null;
+  }
+  if (fields.whatsapp_last_error !== undefined) {
+    patch.whatsapp_last_error = norm(fields.whatsapp_last_error) || null;
+  }
+  if (fields.whatsapp_sent_at !== undefined) {
+    patch.whatsapp_sent_at = fields.whatsapp_sent_at || null;
+  }
+  if (Object.keys(patch).length === 0) {
+    const err = new Error('empty_whatsapp_patch');
+    err.code = 'VALIDATION';
+    throw err;
+  }
+
+  if (usePaymentsEdge()) {
+    return edgeFetch(`/${encodeURIComponent(key)}`, {
+      method: 'PATCH',
+      body: JSON.stringify(patch)
+    });
+  }
+
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('payments')
+    .update(patch)
+    .eq('form_timestamp', key)
+    .select('form_timestamp')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) {
+    const err = new Error('payment_row_not_found');
+    err.code = 'NOT_FOUND';
+    throw err;
+  }
+  return listPayments();
+}
+
 async function publicEdgeFetch(path, options = {}) {
   const anon = process.env.SUPABASE_ANON_KEY || '';
   const bases = [PAYMENTS_FUNCTION_URL, DASHBOARD_FUNCTION_URL]
@@ -310,6 +352,7 @@ async function createPayment(body) {
 module.exports = {
   listPayments,
   updatePaymentDone,
+  updatePaymentWhatsappStatus,
   createPayment,
   listProducts,
   readPayments,

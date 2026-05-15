@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "path": "yassmin-payment-confirm-now",
+        "path": "yassmin-send-payment",
         "httpMethod": "POST",
         "responseMode": "responseNode",
         "options": {}
@@ -13,8 +13,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [-1200, 400],
-      "webhookId": "yassmin-payment-confirm-now-v2",
-      "notes": "Production URL: https://n8n.growleadpro.com/webhook/yassmin-payment-confirm-now — احذفي أي workflow قديم على yassmin-send-payment"
+      "webhookId": "yassmin-send-payment-001",
+      "notes": "اختياري — زر «إرسال الآن» يعمل من Vercel مباشرة. هذا الـ workflow للكرون/اختبار فقط: https://n8n.growleadpro.com/webhook/yassmin-send-payment"
     },
     {
       "parameters": {

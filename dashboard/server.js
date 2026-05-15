@@ -13,7 +13,7 @@ const {
   getProvider,
   PAYMENT_SPREADSHEET_ID
 } = require('./lib/payments-store');
-const { triggerPaymentSendNow } = require('./lib/trigger-payment-send');
+const { sendPaymentWhatsAppNow } = require('./lib/send-payment-whatsapp');
 const {
   listThreads,
   setRoutingMode,
@@ -286,16 +286,17 @@ async function handlePaymentSendNow(req, res, timestamp) {
       });
       return;
     }
-    const result = await triggerPaymentSendNow(formTimestamp);
-    const refreshed = await listPayments();
+    const result = await sendPaymentWhatsAppNow(formTimestamp);
     sendJson(res, 200, {
       ok: true,
       message: 'تم إرسال رسالة التأكيد + PDF على واتساب',
-      sent: true,
+      sent: result.sent,
+      message_id: result.message_id,
       form_timestamp: formTimestamp,
       latencyMs: result.latencyMs,
-      stats: refreshed.stats,
-      rows: refreshed.rows
+      provider: result.provider,
+      stats: result.stats,
+      rows: result.rows
     });
   } catch (error) {
     if (error.code === 'CONFIG') {
