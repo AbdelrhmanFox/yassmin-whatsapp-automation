@@ -42,6 +42,10 @@ function usePaymentsEdge() {
   return Boolean(PAYMENTS_FUNCTION_URL && process.env.SUPABASE_ANON_KEY && !SUPABASE_SERVICE_ROLE_KEY);
 }
 
+function hasServiceRole() {
+  return Boolean(SUPABASE_SERVICE_ROLE_KEY);
+}
+
 module.exports = {
   getSupabase,
   supabaseConfigured,
@@ -49,5 +53,6 @@ module.exports = {
   usePaymentsEdge,
   PAYMENTS_FUNCTION_URL,
   DASHBOARD_FUNCTION_URL,
+  hasServiceRole,
   SCHEMA
 };

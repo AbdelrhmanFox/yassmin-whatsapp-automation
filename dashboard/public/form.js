@@ -127,6 +127,9 @@ form.addEventListener('submit', async (e) => {
         receipt_required: 'يرجى رفع صورة الإيصال',
         receipt_upload_failed: 'تعذر حفظ صورة الإيصال — حاولي مرة أخرى',
         payment_insert_failed: 'تعذر حفظ الطلب — تأكدي من إعدادات السيرفر أو حاولي لاحقًا',
+        function_not_found:
+          'دالة Supabase غير منشورة — انظري الخطوات في رسالة الداشبورد أو أضيفي SERVICE_ROLE_KEY على Vercel',
+        payment_edge_unavailable: 'خدمة الدفع غير متاحة — راجع نشر yassmin-payments-api على Supabase',
         unauthorized: 'السيرفر رفض الطلب — راجع إعدادات Supabase Edge',
         validation_failed: 'بيانات غير مكتملة'
       };

@@ -1,0 +1,8 @@
+[project]
+id = "elcofahsbznfalrbjmfo"
+
+[functions.yassmin-payments-api]
+verify_jwt = false
+
+[functions.yassmin-dashboard-api]
+verify_jwt = false

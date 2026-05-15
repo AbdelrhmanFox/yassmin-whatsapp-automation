@@ -184,10 +184,48 @@ async function updatePaymentDone(formTimestamp, done, options = {}) {
   return listPayments();
 }
 
+async function publicEdgeFetch(path, options = {}) {
+  const anon = process.env.SUPABASE_ANON_KEY || '';
+  const bases = [PAYMENTS_FUNCTION_URL, DASHBOARD_FUNCTION_URL]
+    .filter(Boolean)
+    .map((b) => b.replace(/\/$/, ''));
+  const unique = [...new Set(bases)];
+  let lastError = 'payment_edge_unavailable';
+
+  for (const base of unique) {
+    const url = `${base}${path}`;
+    const res = await fetch(url, {
+      ...options,
+      headers: {
+        apikey: anon,
+        Authorization: `Bearer ${anon}`,
+        'Content-Type': 'application/json',
+        ...(options.headers || {})
+      }
+    });
+    const data = await res.json().catch(() => ({}));
+    const msg = String(data.error || data.message || '');
+    if (res.status === 404 || /not found/i.test(msg)) {
+      lastError = msg || 'function_not_found';
+      continue;
+    }
+    if (!res.ok) {
+      const err = new Error(msg || `edge_${res.status}`);
+      err.code = 'INSERT';
+      throw err;
+    }
+    return data;
+  }
+
+  const err = new Error(lastError);
+  err.code = 'EDGE_MISSING';
+  throw err;
+}
+
 async function listProducts() {
-  if (usePaymentsEdge() && DASHBOARD_FUNCTION_URL) {
+  if (usePaymentsEdge()) {
     const anon = process.env.SUPABASE_ANON_KEY || '';
-    const url = `${DASHBOARD_FUNCTION_URL.replace(/\/$/, '')}/products`;
+    const url = `${(PAYMENTS_FUNCTION_URL || DASHBOARD_FUNCTION_URL).replace(/\/$/, '')}/products`;
     const res = await fetch(url, {
       headers: { apikey: anon, Authorization: `Bearer ${anon}` }
     });
@@ -225,25 +263,11 @@ function slimPayloadForEdge(payload) {
 async function createPayment(body) {
   let payload = buildPaymentPayload(body);
 
-  if (usePaymentsEdge() && DASHBOARD_FUNCTION_URL) {
-    const anon = process.env.SUPABASE_ANON_KEY || '';
-    const url = `${DASHBOARD_FUNCTION_URL.replace(/\/$/, '')}/ingest/payment`;
-    const res = await fetch(url, {
+  if (usePaymentsEdge()) {
+    const data = await publicEdgeFetch('/ingest/payment', {
       method: 'POST',
-      headers: {
-        apikey: anon,
-        Authorization: `Bearer ${anon}`,
-        'Content-Type': 'application/json'
-      },
       body: JSON.stringify(slimPayloadForEdge(payload))
     });
-    const data = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      const err = new Error(data.error || data.message || 'payment_insert_failed');
-      err.code = data.code || 'INSERT';
-      err.details = data.details;
-      throw err;
-    }
     return { ok: true, form_timestamp: payload.form_timestamp, ...data };
   }
 
