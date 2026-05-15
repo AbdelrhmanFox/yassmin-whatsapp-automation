@@ -5,6 +5,7 @@ node_modules/
 !.env.example
 /public/
 .vercel
+.env.vercel-admin-token.txt
 *.xlsx
 ~$*.xlsx
 
