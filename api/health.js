@@ -1,5 +1,5 @@
 const { sheetsConfigured } = require('../dashboard/lib/google-sheets');
-const { supabaseConfigured } = require('../dashboard/lib/supabase');
+const { supabaseConfigured, usePaymentsEdge, PAYMENTS_FUNCTION_URL } = require('../dashboard/lib/supabase');
 const {
   PAYMENT_SPREADSHEET_ID,
   PAYMENT_SHEET,
@@ -18,6 +18,8 @@ module.exports = async (req, res) => {
     platform: process.env.VERCEL ? 'vercel' : 'node',
     databaseProvider: getProvider(),
     supabaseConnected: supabaseConfigured(),
+    supabaseEdgePayments: usePaymentsEdge(),
+    supabasePaymentsFunctionUrl: PAYMENTS_FUNCTION_URL ? true : false,
     sheetsConnected: sheetsConfigured(),
     supabaseSchema: process.env.SUPABASE_SCHEMA || 'yassmin',
     botSpreadsheetId: process.env.BOT_SPREADSHEET_ID || '1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY',

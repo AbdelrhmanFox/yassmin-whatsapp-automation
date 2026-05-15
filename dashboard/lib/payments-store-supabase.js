@@ -1,4 +1,25 @@
-const { getSupabase, SCHEMA } = require('./supabase');
+const { getSupabase, usePaymentsEdge, PAYMENTS_FUNCTION_URL, SCHEMA } = require('./supabase');
+
+async function edgeFetch(path, options = {}) {
+  const anon = process.env.SUPABASE_ANON_KEY || '';
+  const admin = options.adminToken || process.env.DASHBOARD_ADMIN_TOKEN || '';
+  const headers = {
+    apikey: anon,
+    Authorization: `Bearer ${anon}`,
+    'Content-Type': 'application/json',
+    'x-admin-token': admin,
+    ...(options.headers || {})
+  };
+  const url = `${PAYMENTS_FUNCTION_URL.replace(/\/$/, '')}${path}`;
+  const res = await fetch(url, { ...options, headers });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const err = new Error(data.error || `edge_${res.status}`);
+    if (res.status === 404) err.code = 'NOT_FOUND';
+    throw err;
+  }
+  return data;
+}
 
 const MATCH_COL = process.env.PAYMENT_MATCH_COLUMN || 'طابع زمني';
 
@@ -88,6 +109,10 @@ function filterRows(rows, { q = '', status = 'all' }) {
 }
 
 async function readPayments() {
+  if (usePaymentsEdge()) {
+    const data = await edgeFetch('');
+    return { rows: data.rows || [], schema: SCHEMA };
+  }
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('payments')
@@ -99,6 +124,11 @@ async function readPayments() {
 }
 
 async function listPayments(filters = {}) {
+  if (usePaymentsEdge()) {
+    const q = encodeURIComponent(filters.q || '');
+    const status = encodeURIComponent(filters.status || 'all');
+    return edgeFetch(`?q=${q}&status=${status}`);
+  }
   const { rows } = await readPayments();
   const filtered = filterRows(rows, filters);
   return {
@@ -112,6 +142,13 @@ async function listPayments(filters = {}) {
 }
 
 async function updatePaymentDone(formTimestamp, done, options = {}) {
+  if (usePaymentsEdge()) {
+    const id = encodeURIComponent(norm(formTimestamp));
+    return edgeFetch(`/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({ done, resetWhatsapp: options.resetWhatsapp !== false })
+    });
+  }
   const supabase = getSupabase();
   const key = norm(formTimestamp);
   const patch = { done: Boolean(done) };

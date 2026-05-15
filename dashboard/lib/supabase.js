@@ -6,8 +6,13 @@ const SCHEMA = process.env.SUPABASE_SCHEMA || 'yassmin';
 
 let client;
 
+const PAYMENTS_FUNCTION_URL = process.env.SUPABASE_PAYMENTS_FUNCTION_URL || '';
+
 function supabaseConfigured() {
-  return Boolean(SUPABASE_URL && SUPABASE_SERVICE_ROLE_KEY);
+  return Boolean(
+    SUPABASE_URL &&
+      (SUPABASE_SERVICE_ROLE_KEY || (PAYMENTS_FUNCTION_URL && process.env.SUPABASE_ANON_KEY))
+  );
 }
 
 function getSupabase() {
@@ -30,9 +35,15 @@ function useSupabase() {
   return supabaseConfigured();
 }
 
+function usePaymentsEdge() {
+  return Boolean(PAYMENTS_FUNCTION_URL && process.env.SUPABASE_ANON_KEY && !SUPABASE_SERVICE_ROLE_KEY);
+}
+
 module.exports = {
   getSupabase,
   supabaseConfigured,
   useSupabase,
+  usePaymentsEdge,
+  PAYMENTS_FUNCTION_URL,
   SCHEMA
 };
