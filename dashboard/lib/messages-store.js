@@ -182,7 +182,7 @@ async function listThreads(filters = {}) {
     .from('message_log')
     .select('*')
     .order('logged_at', { ascending: false })
-    .limit(60);
+    .limit(120);
 
   return {
     ok: true,

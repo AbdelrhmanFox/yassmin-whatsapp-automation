@@ -353,7 +353,7 @@ function renderMsgStats(stats) {
 
 function renderMessagesTable(threads) {
   if (!threads.length) {
-    messagesBody.innerHTML = '<tr><td colspan="5" class="empty">لا توجد محادثات بعد</td></tr>';
+    messagesBody.innerHTML = '<tr><td colspan="6" class="empty">لا توجد محادثات بعد</td></tr>';
     return;
   }
 
@@ -363,10 +363,12 @@ function renderMessagesTable(threads) {
       const actionBtn = human
         ? `<button type="button" class="btn-sm btn-ok" data-action="auto" data-phone="${escapeHtml(row.phone)}">تفعيل الرد التلقائي</button>`
         : `<button type="button" class="btn-sm btn-warn" data-action="human" data-phone="${escapeHtml(row.phone)}">تحويل لرد بشري</button>`;
-      return `<tr class="msg-thread-row" data-phone="${escapeHtml(row.phone)}" title="اضغطي لعرض سجل المحادثة كاملاً">
+      const kw = row.last_keyword ? truncate(row.last_keyword, 48) : '—';
+      return `<tr class="msg-thread-row" data-phone="${escapeHtml(row.phone)}" title="اضغطي لعرض سجل message_log كاملاً لهذا الرقم">
         <td class="mono">${escapeHtml(row.phone)}</td>
         <td title="${escapeHtml(row.last_inbound_text)}">${escapeHtml(truncate(row.last_inbound_text))}<br><small class="muted">${escapeHtml(formatWhen(row.last_inbound_at || row.last_message_at))}</small></td>
         <td title="${escapeHtml(row.last_reply_text)}">${escapeHtml(truncate(row.last_reply_text || '—'))}</td>
+        <td class="small muted" title="${escapeHtml(row.last_keyword || '')}">${escapeHtml(kw)}</td>
         <td>${msgStatusBadge(row.status)}</td>
         <td>${actionBtn}</td>
       </tr>`;
@@ -390,27 +392,47 @@ function msgDirectionLabel(row) {
   return 'وارد';
 }
 
+function msgRoutingModeLabel(row) {
+  const r = String(row.routing_mode || 'auto').toLowerCase();
+  if (r === 'human') return 'بشري (متوقف)';
+  return 'تلقائي';
+}
+
 function renderRecentMessages(rows) {
   if (!rows.length) {
-    recentMessagesBody.innerHTML = '<tr><td colspan="6" class="empty">لا أحداث بعد</td></tr>';
+    recentMessagesBody.innerHTML = '<tr><td colspan="8" class="empty">لا يوجد سجل message_log بعد — تأكدي أن n8n يستدعي <code>ingest/message</code>.</td></tr>';
     return;
   }
 
   recentMessagesBody.innerHTML = rows
     .map((row) => {
       const status = row.status || (row.reply_sent ? 'auto_replied' : 'received');
-      const inbound = row.message ? truncate(row.message, 72) : '—';
-      const outbound = row.reply_sent ? truncate(row.reply_sent, 72) : '—';
-      return `<tr>
+      const inbound = row.message ? truncate(row.message, 56) : '—';
+      const outbound = row.reply_sent ? truncate(row.reply_sent, 56) : '—';
+      const kw = row.keyword_matched ? truncate(String(row.keyword_matched), 40) : '—';
+      const phone = String(row.phone || '').trim();
+      const phoneAttr = escapeHtml(phone);
+      return `<tr class="msg-log-row" data-phone="${phoneAttr}" title="اضغطي لفتح سجل المحادثة لهذا الرقم">
         <td class="mono small">${escapeHtml(formatWhen(row.logged_at || row.timestamp))}</td>
-        <td class="mono">${escapeHtml(row.phone || '—')}</td>
+        <td class="mono">${phoneAttr ? phoneAttr : '—'}</td>
         <td class="small muted">${escapeHtml(msgDirectionLabel(row))}</td>
         <td title="${escapeHtml(row.message)}">${escapeHtml(inbound)}</td>
+        <td class="small" title="${escapeHtml(row.keyword_matched || '')}">${escapeHtml(kw)}</td>
         <td title="${escapeHtml(row.reply_sent)}">${escapeHtml(outbound)}</td>
+        <td class="small muted">${escapeHtml(msgRoutingModeLabel(row))}</td>
         <td>${msgStatusBadge(status)}</td>
       </tr>`;
     })
     .join('');
+}
+
+function wireRecentMessageLogRows() {
+  if (!recentMessagesBody) return;
+  recentMessagesBody.querySelectorAll('tr.msg-log-row[data-phone]').forEach((tr) => {
+    const phone = tr.getAttribute('data-phone');
+    if (!phone) return;
+    tr.addEventListener('click', () => openMessageThread(phone));
+  });
 }
 
 async function fetchMessages() {
@@ -455,9 +477,10 @@ function renderMessageThreadBubbles(messages) {
     const t = formatWhen(row.logged_at);
     const msg = String(row.message || '').trim();
     const reply = String(row.reply_sent || '').trim();
+    const routeHint = row.routing_mode === 'human' ? ' · توجيه بشري' : '';
     if (msg) {
       parts.push(
-        `<div class="thread-bubble thread-bubble--in"><div class="thread-bubble-meta">${escapeHtml(t)} · وارد${row.keyword_matched ? ` · ${escapeHtml(row.keyword_matched)}` : ''}</div><div class="thread-bubble-text">${escapeHtml(msg)}</div></div>`
+        `<div class="thread-bubble thread-bubble--in"><div class="thread-bubble-meta">${escapeHtml(t)} · وارد${row.keyword_matched ? ` · ${escapeHtml(row.keyword_matched)}` : ''}${escapeHtml(routeHint)}</div><div class="thread-bubble-text">${escapeHtml(msg)}</div></div>`
       );
     }
     if (reply) {
@@ -470,7 +493,7 @@ function renderMessageThreadBubbles(messages) {
 }
 
 async function loadMessages() {
-  messagesBody.innerHTML = '<tr><td colspan="5" class="empty">جاري التحميل…</td></tr>';
+  messagesBody.innerHTML = '<tr><td colspan="6" class="empty">جاري التحميل…</td></tr>';
   try {
     const data = await fetchMessages();
     const provider = data.provider || 'supabase';
@@ -479,8 +502,9 @@ async function loadMessages() {
     renderMsgStats(data.stats);
     renderMessagesTable(data.threads || []);
     renderRecentMessages(data.recent_messages || []);
+    wireRecentMessageLogRows();
   } catch (e) {
-    messagesBody.innerHTML = `<tr><td colspan="5" class="empty error">${escapeHtml(e.message)}</td></tr>`;
+    messagesBody.innerHTML = `<tr><td colspan="6" class="empty error">${escapeHtml(e.message)}</td></tr>`;
     showToast(e.message, 'err');
   }
 }

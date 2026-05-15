@@ -348,6 +348,10 @@ pre {
 
 .msg-thread-row { cursor: pointer; }
 .msg-thread-row:hover { background: rgba(59, 130, 246, 0.08); }
+.msg-log-row { cursor: pointer; }
+.msg-log-row:hover { background: rgba(59, 130, 246, 0.08); }
+.table-card-title { margin: 0 0 12px 0; font-size: 1.05rem; font-weight: 600; }
+.thread-panel-note { margin: 0 0 12px 0; }
 .thread-panel-head {
   display: flex;
   align-items: center;

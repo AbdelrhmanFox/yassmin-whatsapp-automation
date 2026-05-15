@@ -413,7 +413,7 @@ Deno.serve(async (req) => {
             .includes(q)
         );
       }
-      const { data: recent } = await db.from("message_log").select("*").order("logged_at", { ascending: false }).limit(60);
+      const { data: recent } = await db.from("message_log").select("*").order("logged_at", { ascending: false }).limit(120);
       return json(200, {
         ok: true,
         provider: "supabase-edge",

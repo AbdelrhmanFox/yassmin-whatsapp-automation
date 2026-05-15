@@ -106,6 +106,19 @@
             <article class="kpi-card kpi-warn"><span>رسالة جديدة</span><strong id="msgStatReceived">—</strong></article>
           </div>
 
+          <div class="card view-hint" style="margin-bottom: 16px; padding: 14px 16px">
+            <strong>مرجع سجل الرسائل (<code>yassmin.message_log</code>)</strong>
+            <p style="margin: 8px 0 0 0; line-height: 1.55">
+              الجدولان أدناه يعرضان نفس المصدر: <strong>الأول</strong> ملخصًا (آخر نشاط لكل رقم)، و<strong>الثاني</strong>
+              آخر الأحداث <em>سطرًا بسطر</em> كما سجّلها البوت (رسالة العميل، هل وُجدت كلمة مفتاحية، نص الرد التلقائي، الحالة).
+            </p>
+            <p style="margin: 8px 0 0 0; line-height: 1.55" class="muted">
+              <strong>خياراتك:</strong> اضغطي صفًّا في جدول «سجل message_log» أو صفًّا في الملخص لفتح
+              <strong>سجل المحادثة</strong> · من عمود «إجراء» في الملخص: <strong>تحويل لرد بشري</strong> أو
+              <strong>تفعيل الرد التلقائي</strong> · تعديل نصوص الردود من تبويب «ردود البوت».
+            </p>
+          </div>
+
           <div class="toolbar card">
             <input id="msgSearchQ" type="search" placeholder="بحث برقم الواتساب أو نص الرسالة…" />
             <select id="msgFilterStatus">
@@ -116,9 +129,12 @@
             </select>
             <button type="button" id="refreshMessages" class="btn-primary hidden">تحديث الرسائل</button>
           </div>
-          <p class="view-hint" style="margin: 0 0 12px 0">اضغطي على أي صف في الجدول لعرض <strong>سجل المحادثة</strong> (وارد / صادر) لهذا الرقم.</p>
+          <p class="view-hint" style="margin: 0 0 12px 0">
+            في <strong>ملخص المحادثات</strong>: اضغطي الصف لعرض السجل الكامل · في <strong>سجل message_log</strong>: اضغطي أي صف لنفس الرقم.
+          </p>
 
           <div class="card table-card">
+            <h3 class="table-card-title">ملخص المحادثات (آخر نشاط لكل رقم)</h3>
             <div class="table-wrap">
               <table class="data-table">
                 <thead>
@@ -126,19 +142,23 @@
                     <th>الواتساب</th>
                     <th>آخر رسالة</th>
                     <th>الرد التلقائي</th>
+                    <th>آخر كلمة مطابقة</th>
                     <th>الحالة</th>
                     <th>إجراء</th>
                   </tr>
                 </thead>
                 <tbody id="messagesBody">
-                  <tr><td colspan="5" class="empty">جاري التحميل…</td></tr>
+                  <tr><td colspan="6" class="empty">جاري التحميل…</td></tr>
                 </tbody>
               </table>
             </div>
           </div>
 
           <div class="card" style="margin-top: 16px">
-            <h3 style="margin-top: 0">آخر الأحداث (سجل)</h3>
+            <h3 style="margin-top: 0">سجل message_log — آخر الأحداث (مرجع زمني)</h3>
+            <p class="muted small" style="margin: 0 0 10px 0">
+              كل صف = إدخال واحد في <code>message_log</code> (وارد من العميل و/أو رد البوت المسجّل عند الإرسال).
+            </p>
             <div class="table-wrap">
               <table class="data-table data-table--compact">
                 <thead>
@@ -147,12 +167,14 @@
                     <th>الرقم</th>
                     <th>الاتجاه</th>
                     <th>وارد من العميل</th>
+                    <th>كلمة / قاعدة</th>
                     <th>صادر / رد</th>
+                    <th>توجيه البوت</th>
                     <th>الحالة</th>
                   </tr>
                 </thead>
                 <tbody id="recentMessagesBody">
-                  <tr><td colspan="6" class="empty">—</td></tr>
+                  <tr><td colspan="8" class="empty">—</td></tr>
                 </tbody>
               </table>
             </div>
@@ -163,6 +185,9 @@
               <h3 style="margin: 0">سجل المحادثة · <span id="threadPhone" class="mono"></span></h3>
               <button type="button" id="closeThreadPanel" class="btn-sm">إغلاق ❌</button>
             </div>
+            <p class="muted small thread-panel-note">
+              مبني على صفوف <code>message_log</code> لهذا الرقم (ترتيب زمني).
+            </p>
             <div id="threadBubbles" class="thread-bubbles"></div>
           </div>
         </section>
