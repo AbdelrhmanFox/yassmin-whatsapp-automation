@@ -1,4 +1,4 @@
-const { pushHistoryItem } = require('./lib/action-history');
+const { pushHistoryItem } = require('../dashboard/lib/action-history');
 const { sendJson, requireAuth } = require('./_helpers');
 
 const CONTROL_WEBHOOK_URL = process.env.CONTROL_WEBHOOK_URL || '';

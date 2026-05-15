@@ -1,4 +1,4 @@
-const { listHistory } = require('./lib/action-history');
+const { listHistory } = require('../dashboard/lib/action-history');
 const { sendJson, requireAuth } = require('./_helpers');
 
 module.exports = async (req, res) => {
