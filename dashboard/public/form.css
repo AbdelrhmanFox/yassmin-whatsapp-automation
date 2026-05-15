@@ -103,3 +103,76 @@ input[type='file'] {
   padding: 8px;
   font-size: 13px;
 }
+
+.pay-box {
+  margin: 12px 0 4px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1px solid #1d4ed8;
+  background: linear-gradient(180deg, #0c1929 0%, #111827 100%);
+}
+
+.pay-box-title {
+  margin: 0 0 6px;
+  font-weight: 700;
+  color: #93c5fd;
+  font-size: 15px;
+}
+
+.pay-box-hint {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: #94a3b8;
+  line-height: 1.5;
+}
+
+.pay-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 10px;
+  margin-bottom: 10px;
+}
+
+.pay-row:last-child {
+  margin-bottom: 0;
+}
+
+.pay-label {
+  flex: 1 1 100%;
+  font-size: 12px;
+  color: #64748b;
+}
+
+.pay-value {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f8fafc;
+  text-decoration: none;
+}
+
+.pay-phone {
+  letter-spacing: 0.04em;
+}
+
+.pay-link {
+  color: #60a5fa;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.pay-link:hover {
+  text-decoration: underline;
+}
+
+.btn-copy {
+  width: auto;
+  margin: 0;
+  padding: 6px 12px;
+  font-size: 12px;
+  background: #334155;
+}
+
+.btn-copy:hover {
+  background: #475569;
+}

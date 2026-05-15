@@ -1,11 +1,36 @@
 const form = document.getElementById('paymentForm');
 const productSelect = document.getElementById('product_code');
+const paymentMethodSelect = document.getElementById('payment_method');
+const localPayBox = document.getElementById('localPayBox');
+const copyPhoneBtn = document.getElementById('copyPhoneBtn');
 const submitBtn = document.getElementById('submitBtn');
 const formError = document.getElementById('formError');
 const formSuccess = document.getElementById('formSuccess');
 const successMsg = document.getElementById('successMsg');
 
+const PAY_LOCAL = 'فودافون كاش/انستا باي';
+const PAY_PHONE = '01090321007';
 const MAX_FILE = 4 * 1024 * 1024;
+
+function updatePaymentInstructions() {
+  const method = paymentMethodSelect.value;
+  const showLocal = method === PAY_LOCAL;
+  localPayBox.classList.toggle('hidden', !showLocal);
+}
+
+paymentMethodSelect.addEventListener('change', updatePaymentInstructions);
+
+copyPhoneBtn.addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText(PAY_PHONE);
+    copyPhoneBtn.textContent = 'تم النسخ';
+    setTimeout(() => {
+      copyPhoneBtn.textContent = 'نسخ';
+    }, 2000);
+  } catch {
+    copyPhoneBtn.textContent = PAY_PHONE;
+  }
+});
 
 function showError(msg) {
   formError.textContent = msg;
@@ -121,6 +146,7 @@ document.getElementById('sendAnother').addEventListener('click', () => {
   form.classList.remove('hidden');
   formSuccess.classList.add('hidden');
   hideError();
+  updatePaymentInstructions();
   loadProducts();
 });
 

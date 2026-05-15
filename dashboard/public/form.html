@@ -33,6 +33,28 @@
           <option value="للدفع من خارج مصر">للدفع من خارج مصر</option>
         </select>
 
+        <div id="localPayBox" class="pay-box hidden" aria-live="polite">
+          <p class="pay-box-title">بيانات التحويل</p>
+          <p class="pay-box-hint">حوّلي المبلغ على الرقم أو عبر InstaPay، ثم ارفعي صورة الإيصال بالأسفل.</p>
+          <div class="pay-row">
+            <span class="pay-label">فودافون كاش / انستا باي</span>
+            <a class="pay-value pay-phone" id="payPhoneLink" href="tel:01090321007" dir="ltr">01090321007</a>
+            <button type="button" class="btn-copy" id="copyPhoneBtn" aria-label="نسخ الرقم">نسخ</button>
+          </div>
+          <div class="pay-row">
+            <span class="pay-label">رابط InstaPay</span>
+            <a
+              class="pay-value pay-link"
+              id="instapayLink"
+              href="https://ipn.eg/S/qyrol/instapay/9sAdnW"
+              target="_blank"
+              rel="noopener noreferrer"
+              dir="ltr"
+              >فتح رابط الدفع</a
+            >
+          </div>
+        </div>
+
         <label for="phone">رقم الواتساب الذي تم التواصل منه <span class="req">*</span></label>
         <input id="phone" name="phone" type="tel" required dir="ltr" placeholder="01xxxxxxxxx" />
 
