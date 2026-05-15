@@ -1,4 +1,4 @@
-const { pushHistoryItem } = require('../dashboard/lib/action-history');
+const { pushHistoryItem, listHistory } = require('../dashboard/lib/action-history');
 const { sendJson, requireAuth } = require('./_helpers');
 
 const CONTROL_WEBHOOK_URL = process.env.CONTROL_WEBHOOK_URL || '';
@@ -6,6 +6,11 @@ const CONTROL_WEBHOOK_URL = process.env.CONTROL_WEBHOOK_URL || '';
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') {
     res.status(204).end();
+    return;
+  }
+  if (req.method === 'GET') {
+    if (!requireAuth(req, res)) return;
+    sendJson(res, 200, { ok: true, items: listHistory() });
     return;
   }
   if (req.method !== 'POST') {

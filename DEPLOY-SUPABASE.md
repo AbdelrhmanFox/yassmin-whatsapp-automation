@@ -38,7 +38,6 @@
 ## متغيرات البيئة (Vercel / محلي)
 
 ```env
-DATABASE_PROVIDER=supabase
 SUPABASE_URL=https://xxxx.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=eyJ...
 SUPABASE_SCHEMA=yassmin
@@ -46,7 +45,7 @@ DASHBOARD_ADMIN_TOKEN=توكن-قوي
 DASHBOARD_DISABLE_AUTH=false
 ```
 
-لوحة التحكم تستخدم Supabase تلقائياً عند وجود المفاتيح. للرجوع لـ Sheets مؤقتاً: `DATABASE_PROVIDER=sheets`.
+لوحة التحكم تستخدم Supabase فقط عند وجود المفاتيح أعلاه (مع دوال Edge عند الحاجة).
 
 ## كلمات الرد (`yassmin.keywords`)
 
@@ -56,26 +55,15 @@ DASHBOARD_DISABLE_AUTH=false
   مع ترويسات `apikey` و `Authorization: Bearer <SUPABASE_ANON_KEY>`. الاستجابة: `{ "ok": true, "keywords": [ { "id", "keyword", "reply", "active", "sort_order", … } ] }`.
 - **كتابة من Edge** (اختياري): `POST/PATCH/DELETE …/keywords` مع ترويسة `x-admin-token` نفس `DASHBOARD_ADMIN_TOKEN` إن وُجدت على الدالة.
 
-## ترحيل البيانات من Google Sheets
+## ترحيل بيانات قديمة
 
-```bash
-cp .env.example .env
-# املأ Google OAuth + Supabase keys
-npm install
-npm run migrate:sheets-to-supabase
-```
-
-المفتاح الفريد لكل دفعة: **`form_timestamp`** (= عمود `طابع زمني` في الفورم).
+- تصدير CSV عام ثم: `npm run migrate:csv-to-supabase` (انظري `scripts/migrate-csv-to-supabase.mjs`).
 
 ## n8n + Supabase
 
-استبدل عقد **Google Sheets** بعقد **Supabase** (أو HTTP Request إلى REST):
-
-- **Schema**: `yassmin`
-- **قراءة دفعات للإرسال**: `payments` حيث `done = true` و `whatsapp_status` فارغ أو `failed`
-- **بعد الإرسال**: `UPDATE` على `form_timestamp` → `whatsapp_status`, `whatsapp_sent_at`
-- **خريطة PDF**: `product_pdf_map` حسب `product_code`
-- **paused_chats / bot_outbound / keywords**: نفس أسماء التبويبات السابقة في Sheets
+- **البوت**: استورد [`whatsapp-bot-yassmin-supabase-only.json`](whatsapp-bot-yassmin-supabase-only.json) (انظري [`N8N-SUPABASE-ONLY.md`](N8N-SUPABASE-ONLY.md)).
+- **الكرون**: [`payment-auto-send-cron-supabase-n8n-workflow.json`](payment-auto-send-cron-supabase-n8n-workflow.json)
+- **Schema**: `yassmin` — الجداول `payments`, `product_pdf_map`, `keywords`, `message_log`, إلخ.
 
 **لو تبويب «الرسائل» في اللوحة فاضي:** تأكدي أن workflow البوت يستدعي `POST .../yassmin-dashboard-api/ingest/message` بعد كل رسالة. لو عندك `N8N_WEBHOOK_SECRET` على دالة Edge، لازم نفس القيمة تُرسل من n8n في ترويسة `x-n8n-secret` وإلا الـ ingest يرجع 401 ولا يُسجَّل شيء في `message_log`.
 
@@ -89,7 +77,7 @@ npm run migrate:sheets-to-supabase
    - `YASSMIN_SUPABASE_FUNCTIONS_URL` — مثل `https://المشروع.supabase.co/functions/v1` (بدون شرطة أخيرة)
    - `SUPABASE_ANON_KEY`
    - `EVOLUTION_API_URL`، `EVOLUTION_INSTANCE`، `EVOLUTION_API_KEY`
-4. **عطّل** مسار **«Cron: Every 30 Minutes»** الذي يقرأ **Google Sheets** في `full-whatsapp-bot-yassmin-workflow.json` أو `whatsapp-payment-confirmation-workflow.json` حتى لا يحدث إرسال مزدوج لصفوف ما زالت على الشيت.
+4. عطّلي أي workflow قديم على n8n كان يقرأ **Google Sheets** لنفس الدفعات حتى لا يحدث إرسال مزدوج.
 
 زر **«إرسال الآن»** في الداشبورد يظل يعمل فورًا من Vercel بغض النظر عن الكرون.
 
@@ -101,12 +89,9 @@ Header: apikey + Authorization: Bearer SERVICE_ROLE
 Header: Accept-Profile: yassmin
 ```
 
-## Google Form
+## Google Form / الفورم العام
 
-خياران:
-
-1. **مؤقت**: الفورم يبقى على Sheets + `npm run migrate:sheets-to-supabase` دورياً.
-2. **نهائي**: Webhook من n8n عند إرسال الفورم → `INSERT` في `yassmin.payments`.
+الفورم العام يكتب عبر **Edge** (`ingest/payment`) أو واجهة اللوحة — انظري `dashboard/public/form.html` و`api/`.
 
 ## أخطاء Vercel / النشر — لماذا تتكرر؟
 

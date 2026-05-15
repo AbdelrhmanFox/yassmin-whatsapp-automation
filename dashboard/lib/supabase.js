@@ -59,9 +59,6 @@ function getSupabase() {
 }
 
 function useSupabase() {
-  const provider = (process.env.DATABASE_PROVIDER || '').toLowerCase();
-  if (provider === 'sheets') return false;
-  if (provider === 'supabase') return supabaseConfigured();
   return supabaseConfigured();
 }
 

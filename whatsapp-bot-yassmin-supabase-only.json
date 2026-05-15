@@ -1,4 +1,5 @@
 {
+  "name": "WhatsApp Bot Yassmin — Supabase only",
   "nodes": [
     {
       "parameters": {
@@ -152,38 +153,61 @@
     },
     {
       "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "keywords",
-          "mode": "name"
+        "method": "GET",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/keywords",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
         },
         "options": {
-          "returnAllMatches": true
+          "timeout": 20000
         }
       },
       "id": "487b1ec3-8a1d-4e15-a29f-587a8ca8a52d",
-      "name": "Sheets: Read Keywords",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
+      "name": "HTTP: Read Keywords (DB)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
       "position": [
         -5648,
         1808
       ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      }
+      "alwaysOutputData": true,
+      "settings": {
+        "alwaysOutputData": true
+      },
+      "notesInFlow": true,
+      "notes": "يجلب الكلمات من Supabase (نفس مصدر لوحة التحكم) — لا تعتمد على شيت Google."
     },
     {
       "parameters": {
-        "jsCode": "const source = $('Set: Extract Fields').first().json;\nconst messageRaw = String(source.message_text || '').trim();\nconst message = messageRaw.toLowerCase();\nconst rows = $input.all().map(item => item.json);\n\nlet matched = null;\n\nfor (const row of rows) {\n  if (row.active === false || row.active === 'FALSE') continue;\n  if (row.keyword && row.keyword.trim().toLowerCase() === 'default') continue;\n\n  const keywords = String(row.keyword || '').toLowerCase().split(',').map(k => k.trim());\n\n  for (const kw of keywords) {\n    if (kw && message.includes(kw)) {\n      matched = row;\n      break;\n    }\n  }\n\n  if (matched) break;\n}\n\n// If no keyword matched but user sent contact data (email/phone),\n// skip default reply so flow can continue to the data/payment path silently.\nconst hasEmailInMsg = /[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}/.test(messageRaw);\nconst hasPhoneInMsg = /0[0-9]{9,12}|\\+?[0-9]{10,14}/.test(messageRaw);\n\nlet keywordMatched = '';\nlet reply = '';\n\nif (matched) {\n  keywordMatched = matched.keyword;\n  reply = matched.reply;\n} else if (!(hasEmailInMsg || hasPhoneInMsg)) {\n  const defaultRow = rows.find(r => r.keyword && String(r.keyword).trim().toLowerCase() === 'default');\n  keywordMatched = defaultRow?.keyword || 'default';\n  reply = defaultRow?.reply || \"Sorry, I didn't understand that. Please try again.\";\n}\n\nreturn [{\n  json: {\n    keyword_matched: keywordMatched,\n    reply,\n    phone: source.phone,\n    message_text: source.message_text,\n    message_id: source.message_id,\n    received_at: source.received_at\n  }\n}];"
+        "jsCode": "const data = $input.first().json || {};\nconst raw = Array.isArray(data.keywords) ? data.keywords : [];\nconst rows = raw.map((k) => ({\n  json: {\n    keyword: k.keyword != null ? String(k.keyword) : '',\n    reply: k.reply != null ? String(k.reply) : '',\n    active: k.active !== false && String(k.active ?? '').toUpperCase() !== 'FALSE'\n  }\n}));\nif (!rows.length) {\n  return [{\n    json: {\n      keyword: 'default',\n      reply: \"Sorry, I didn't understand that. Please try again.\",\n      active: true\n    }\n  }];\n}\nreturn rows;"
+      },
+      "id": "c9e4f1a2-3b4c-5d6e-7f80-a1b2c3d4e5f6",
+      "name": "Code: Keywords DB to Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5536,
+        1808
+      ],
+      "notes": "يحوّل استجابة { keywords: [...] } إلى صفوف كما كان يخرجها Google Sheets."
+    },
+    {
+      "parameters": {
+        "jsCode": "const source = $('Set: Extract Fields').first().json;\nconst messageRaw = String(source.message_text || '').trim();\nconst message = messageRaw.toLowerCase();\nconst rows = $input.all().map(item => item.json);\n\nconst splitTriggers = (cell) =>\n  String(cell || '')\n    .toLowerCase()\n    .split(/[,\\u060C\\n]+/)\n    .map((k) => k.trim())\n    .filter(Boolean);\n\nlet matched = null;\n\nfor (const row of rows) {\n  if (row.active === false || row.active === 'FALSE') continue;\n  if (row.keyword && row.keyword.trim().toLowerCase() === 'default') continue;\n\n  const keywords = splitTriggers(row.keyword);\n\n  for (const kw of keywords) {\n    if (kw && message.includes(kw)) {\n      matched = row;\n      break;\n    }\n  }\n\n  if (matched) break;\n}\n\n// If no keyword matched but user sent contact data (email/phone),\n// skip default reply so flow can continue to the data/payment path silently.\nconst hasEmailInMsg = /[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}/.test(messageRaw);\nconst hasPhoneInMsg = /0[0-9]{9,12}|\\+?[0-9]{10,14}/.test(messageRaw);\n\nlet keywordMatched = '';\nlet reply = '';\n\nif (matched) {\n  keywordMatched = matched.keyword;\n  reply = matched.reply;\n} else if (!(hasEmailInMsg || hasPhoneInMsg)) {\n  const defaultRow = rows.find(r => r.keyword && String(r.keyword).trim().toLowerCase() === 'default');\n  keywordMatched = defaultRow?.keyword || 'default';\n  reply = defaultRow?.reply || \"Sorry, I didn't understand that. Please try again.\";\n}\n\nreturn [{\n  json: {\n    keyword_matched: keywordMatched,\n    reply,\n    phone: source.phone,\n    message_text: source.message_text,\n    message_id: source.message_id,\n    received_at: source.received_at\n  }\n}];"
       },
       "id": "5eacc5a0-5a27-4d10-89e1-c216bc3cce56",
       "name": "Code: Keyword Matcher",
@@ -238,41 +262,6 @@
         -4976,
         1904
       ]
-    },
-    {
-      "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "message_log",
-          "mode": "name"
-        },
-        "options": {
-          "returnAllMatches": true
-        }
-      },
-      "id": "3c24b68f-9b66-4ed7-ab58-2eb67bec9470",
-      "name": "Sheets: Read Full Log",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "position": [
-        -4976,
-        1712
-      ],
-      "settings": {
-        "alwaysOutputData": true
-      },
-      "alwaysOutputData": true,
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      }
     },
     {
       "parameters": {
@@ -349,19 +338,6 @@
     },
     {
       "parameters": {
-        "jsCode": "// Resolve @lid to real phone number if needed\nconst data = $input.first().json;\nconst rawPhone = data.phone || '';\n\n// If it's a real number (not @lid), use as-is\nif (!rawPhone.includes('@lid')) {\n  const clean = rawPhone.replace(/@.*/, '').replace(/\\D/g, '');\n  return [{ json: { ...data, phone: clean } }];\n}\n\n// For @lid: try to get real number from Evolution contacts API\ntry {\n  const http = require('https');\n  const url = `http://evolution_api:8080/contact/fetchProfile/test?number=${encodeURIComponent(rawPhone)}`;\n  const result = await new Promise((resolve) => {\n    const req = require('http').get(url, { headers: { apikey: 'admin' } }, (res) => {\n      let d = '';\n      res.on('data', c => d += c);\n      res.on('end', () => {\n        try { resolve(JSON.parse(d)); } catch { resolve(null); }\n      });\n    });\n    req.on('error', () => resolve(null));\n    req.setTimeout(5000, () => { req.destroy(); resolve(null); });\n  });\n\n  if (result && result.numberExists && result.jid) {\n    const clean = result.jid.replace(/@.*/, '').replace(/\\D/g, '');\n    return [{ json: { ...data, phone: clean } }];\n  }\n} catch (e) {}\n\n// Fallback: use @lid as-is and hope Evolution resolves it\nreturn [{ json: { ...data, phone: rawPhone } }];"
-      },
-      "id": "ec55b637-5a2a-442e-a160-070994c1630b",
-      "name": "Code: Resolve LID Phone",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -4304,
-        2000
-      ]
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "=https://evolution.growleadpro.com/message/sendText/{{ $('Webhook: Receive WA Message').first().json.body.instance ?? 'test' }}",
         "sendHeaders": true,
@@ -395,109 +371,6 @@
         1808
       ],
       "notes": "Sends reply text via Evolution API. Uses configured instance and API key."
-    },
-    {
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "message_log",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "timestamp": "={{ $('Code: Keyword Matcher').first().json.received_at }}",
-            "phone": "={{ $('Code: Keyword Matcher').first().json.phone }}",
-            "message": "={{ $('Code: Keyword Matcher').first().json.message_text }}",
-            "keyword_matched": "={{ $('Code: Keyword Matcher').first().json.keyword_matched }}",
-            "reply_sent": "={{ $('Code: Keyword Matcher').first().json.reply }}",
-            "status": "replied",
-            "message_id": "={{ $('Code: Keyword Matcher').first().json.message_id }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "timestamp",
-              "displayName": "timestamp",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "phone",
-              "displayName": "phone",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "message",
-              "displayName": "message",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "keyword_matched",
-              "displayName": "keyword_matched",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "reply_sent",
-              "displayName": "reply_sent",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "message_id",
-              "displayName": "message_id",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "7ba87f32-ed94-4010-8ac0-e128ea85e0c7",
-      "name": "Sheets: Append Log",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "notesInFlow": true,
-      "position": [
-        -3856,
-        1808
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      },
-      "notes": "Writes audit log row to Google Sheets message_log tab for traceability."
     },
     {
       "parameters": {
@@ -600,455 +473,6 @@
     },
     {
       "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "email_leads",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "created_at": "={{ $json.received_at || $now.toISO() }}",
-            "last_seen_at": "={{ $json.received_at || $now.toISO() }}",
-            "email": "={{ 'no_email:' + ($json.phone || 'unknown') }}",
-            "phone": "={{ $json.phone_in_message || $json.phone }}",
-            "name_hint": "={{ $json.name_hint }}",
-            "intent_type": "={{ $json.intent_type }}",
-            "latest_message": "={{ $json.message_text }}",
-            "message_id": "={{ $json.message_id }}",
-            "source": "whatsapp",
-            "status": "no_email"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "last_seen_at",
-              "displayName": "last_seen_at",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "email",
-              "displayName": "email",
-              "required": true,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "phone",
-              "displayName": "phone",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "name_hint",
-              "displayName": "name_hint",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "intent_type",
-              "displayName": "intent_type",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "latest_message",
-              "displayName": "latest_message",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "message_id",
-              "displayName": "message_id",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "source",
-              "displayName": "source",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "c4660a1c-21d5-44a3-8e6d-1f175cbde391",
-      "name": "Sheets: Append No Email Lead",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "notesInFlow": true,
-      "position": [
-        -4976,
-        1328
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      },
-      "notes": "When message has no email, append a lead row with status=no_email using synthetic key no_email:{phone}."
-    },
-    {
-      "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "email_leads",
-          "mode": "name"
-        },
-        "options": {
-          "returnAllMatches": true
-        }
-      },
-      "id": "b3927298-0915-4b98-ac3f-70edd1360b78",
-      "name": "Sheets: Read Email Leads",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "alwaysOutputData": true,
-      "notesInFlow": true,
-      "position": [
-        -5200,
-        1136
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      },
-      "notes": "Reads all rows from email_leads tab. alwaysOutputData=true ensures the next Code node runs even when the sheet is empty."
-    },
-    {
-      "parameters": {
-        "jsCode": "// Determine if this email already exists in email_leads (upsert logic)\nconst emailData = $('Code: Email Extract & Classify').first().json;\nconst existingRows = $input.all().map(r => r.json).filter(r => r.email && String(r.email).length > 0);\n\nconst matchingRow = existingRows.find(r =>\n  String(r.email || '').toLowerCase().trim() === emailData.email\n);\nconst emailExists = Boolean(matchingRow);\nconst now = new Date().toISOString();\n\nreturn [{ json: {\n  ...emailData,\n  email_exists: emailExists,\n  created_at: matchingRow ? (matchingRow.created_at || now) : now,\n  last_seen_at: now,\n  status: emailExists ? 'updated' : 'new'\n} }];"
-      },
-      "id": "88b0e555-d298-4543-91c0-387aae95086b",
-      "name": "Code: Email Upsert Logic",
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "notesInFlow": true,
-      "position": [
-        -4976,
-        1136
-      ],
-      "notes": "Searches existing email_leads rows for a matching email. Sets email_exists=true and preserves original created_at for updates; sets status='new' or 'updated' accordingly."
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "options": {
-            "caseSensitive": true,
-            "leftValue": "",
-            "typeValidation": "strict",
-            "version": 2
-          },
-          "conditions": [
-            {
-              "id": "c-email-exists",
-              "leftValue": "={{ $json.email_exists }}",
-              "rightValue": true,
-              "operator": {
-                "type": "boolean",
-                "operation": "equals"
-              }
-            }
-          ],
-          "combinator": "and"
-        },
-        "options": {}
-      },
-      "id": "746a84b5-ad3b-4c73-a796-6daebee5a136",
-      "name": "IF: Email Exists?",
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 2,
-      "notesInFlow": true,
-      "position": [
-        -4752,
-        1136
-      ],
-      "notes": "TRUE → email already in sheet → update existing row (last_seen_at, intent, phone, message). FALSE → new email → append fresh row."
-    },
-    {
-      "parameters": {
-        "operation": "update",
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "email_leads",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "email": "={{ $json.email }}",
-            "last_seen_at": "={{ $json.last_seen_at }}",
-            "latest_message": "={{ $json.message_text }}",
-            "intent_type": "={{ $json.intent_type }}",
-            "phone": "={{ $json.phone }}",
-            "name_hint": "={{ $json.name_hint }}",
-            "status": "updated"
-          },
-          "matchingColumns": [
-            "email"
-          ],
-          "schema": [
-            {
-              "id": "email",
-              "displayName": "email",
-              "required": true,
-              "defaultMatch": true,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "last_seen_at",
-              "displayName": "last_seen_at",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "latest_message",
-              "displayName": "latest_message",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "intent_type",
-              "displayName": "intent_type",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "phone",
-              "displayName": "phone",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "name_hint",
-              "displayName": "name_hint",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "85c28190-365a-4a81-9994-fb20226cf72b",
-      "name": "Sheets: Update Email Lead",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "notesInFlow": true,
-      "position": [
-        -4528,
-        1040
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      },
-      "notes": "Updates the existing email_leads row matching on email column: refreshes last_seen_at, latest_message, intent_type, phone, name_hint, status=updated."
-    },
-    {
-      "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "email_leads",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "created_at": "={{ $json.created_at }}",
-            "last_seen_at": "={{ $json.last_seen_at }}",
-            "email": "={{ $json.email }}",
-            "phone": "={{ $json.phone }}",
-            "name_hint": "={{ $json.name_hint }}",
-            "intent_type": "={{ $json.intent_type }}",
-            "latest_message": "={{ $json.message_text }}",
-            "message_id": "={{ $json.message_id }}",
-            "source": "whatsapp",
-            "status": "new"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "created_at",
-              "displayName": "created_at",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "last_seen_at",
-              "displayName": "last_seen_at",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "email",
-              "displayName": "email",
-              "required": true,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "phone",
-              "displayName": "phone",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "name_hint",
-              "displayName": "name_hint",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "intent_type",
-              "displayName": "intent_type",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "latest_message",
-              "displayName": "latest_message",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "message_id",
-              "displayName": "message_id",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "source",
-              "displayName": "source",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "status",
-              "displayName": "status",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "86a0f184-736c-4b5c-a1d3-2210aec3f182",
-      "name": "Sheets: Append Email Lead",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "notesInFlow": true,
-      "position": [
-        -4528,
-        1328
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      },
-      "notes": "Appends a brand-new row to email_leads for a first-time email. Columns: created_at, last_seen_at, email, phone, name_hint, intent_type, latest_message, message_id, source, status=new."
-    },
-    {
-      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -1131,41 +555,6 @@
     },
     {
       "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "bot_outbound",
-          "mode": "name"
-        },
-        "options": {
-          "returnAllMatches": true
-        }
-      },
-      "id": "3605cb75-f0b7-410d-87da-fdfbf4ecd886",
-      "name": "Sheets: Read Bot Outbound",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "position": [
-        -5872,
-        2016
-      ],
-      "alwaysOutputData": true,
-      "settings": {
-        "alwaysOutputData": true
-      },
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      }
-    },
-    {
-      "parameters": {
         "jsCode": "function normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  while (d.startsWith('0020') && d.length > 12) d = d.slice(2);\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nconst src = $('Set: Extract Outgoing Fields').first().json;\nconst webhook = $('Webhook: Receive WA Message').first().json;\nconst d = (webhook.body?.data ?? webhook.data) || {};\nconst messageId = String(d.key?.id || src.message_id || '');\nconst phone = normalizePhone(src.phone);\nconst outboundRows = $input.all().map((i) => i.json).filter((r) => r.message_id);\n\nif (messageId && outboundRows.some((r) => String(r.message_id) === messageId)) {\n  return [{ json: { is_bot_message: true, skip_reason: 'bot_outbound_id', phone, message_id: messageId } }];\n}\n\nconst now = Date.now();\nconst recentBot = outboundRows.some((r) => {\n  if (normalizePhone(r.phone) !== phone) return false;\n  const t = new Date(r.sent_at).getTime();\n  return Number.isFinite(t) && now - t < 90000;\n});\nif (recentBot) {\n  return [{ json: { is_bot_message: true, skip_reason: 'recent_bot_send', phone, message_id: messageId } }];\n}\n\nreturn [{ json: { is_bot_message: false, phone, message_id: messageId } }];"
       },
       "id": "ba4eecb2-350e-4fc1-b220-f50bb763c763",
@@ -1212,41 +601,6 @@
     },
     {
       "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "paused_chats",
-          "mode": "name"
-        },
-        "options": {
-          "returnAllMatches": true
-        }
-      },
-      "id": "75a9017e-39ea-4d67-a366-58b393f89c0e",
-      "name": "Sheets: Read Paused Chats Handoff",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "position": [
-        -5200,
-        2136
-      ],
-      "alwaysOutputData": true,
-      "settings": {
-        "alwaysOutputData": true
-      },
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      }
-    },
-    {
-      "parameters": {
         "jsCode": "function normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  while (d.startsWith('0020') && d.length > 12) d = d.slice(2);\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nconst src = $('Set: Extract Outgoing Fields').first().json;\nconst phone = normalizePhone(src.phone);\nconst now = new Date();\nconst nowIso = now.toISOString();\nconst expiresIso = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();\n\nlet existingRows = [];\ntry {\n  const http = $('HTTP: Read Paused Chats Handoff (DB)').first().json;\n  if (Array.isArray(http.rows)) existingRows = http.rows;\n} catch {}\nif (!existingRows.length) {\n  try {\n    existingRows = $('Sheets: Read Paused Chats Handoff').all().map((i) => i.json);\n  } catch {}\n}\n\nconst existing = existingRows.find((r) => normalizePhone(r.phone) === phone);\n\nreturn [{\n  json: {\n    phone,\n    paused_at: existing?.paused_at || nowIso,\n    last_human_at: nowIso,\n    expires_at: expiresIso,\n    reason: 'human_handoff',\n    active: 'TRUE'\n  }\n}];"
       },
       "id": "5d208ac7-ed54-4fbf-b19a-d63cf65e754d",
@@ -1259,100 +613,6 @@
       ]
     },
     {
-      "parameters": {
-        "operation": "appendOrUpdate",
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "paused_chats",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "phone": "={{ $json.phone }}",
-            "paused_at": "={{ $json.paused_at }}",
-            "last_human_at": "={{ $json.last_human_at }}",
-            "expires_at": "={{ $json.expires_at }}",
-            "reason": "={{ $json.reason }}",
-            "active": "={{ $json.active }}"
-          },
-          "matchingColumns": [
-            "phone"
-          ],
-          "schema": [
-            {
-              "id": "phone",
-              "displayName": "phone",
-              "required": false,
-              "defaultMatch": true,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "paused_at",
-              "displayName": "paused_at",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "last_human_at",
-              "displayName": "last_human_at",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "expires_at",
-              "displayName": "expires_at",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "reason",
-              "displayName": "reason",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "active",
-              "displayName": "active",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "d6fd616e-f60a-4f2b-8769-5dd0491b6328",
-      "name": "Sheets: Upsert Paused Chat",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "position": [
-        -4976,
-        2016
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      }
-    },
-    {
       "parameters": {},
       "id": "570acab8-e953-4ce1-b0af-eefa4ca45ab6",
       "name": "No Op: Skip Bot Outgoing",
@@ -1362,41 +622,6 @@
         -5424,
         2136
       ]
-    },
-    {
-      "parameters": {
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "paused_chats",
-          "mode": "name"
-        },
-        "options": {
-          "returnAllMatches": true
-        }
-      },
-      "id": "22dd13cc-ea44-411f-8760-6c3e938442da",
-      "name": "Sheets: Read Paused Chats Gate",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "position": [
-        -5648,
-        1520
-      ],
-      "alwaysOutputData": true,
-      "settings": {
-        "alwaysOutputData": true
-      },
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      }
     },
     {
       "parameters": {
@@ -1505,91 +730,6 @@
     },
     {
       "parameters": {
-        "operation": "append",
-        "documentId": {
-          "__rl": true,
-          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
-          "mode": "id"
-        },
-        "sheetName": {
-          "__rl": true,
-          "value": "bot_outbound",
-          "mode": "name"
-        },
-        "columns": {
-          "mappingMode": "defineBelow",
-          "value": {
-            "message_id": "={{ $json.message_id }}",
-            "phone": "={{ $json.phone }}",
-            "source": "={{ $json.source }}",
-            "sent_at": "={{ $json.sent_at }}"
-          },
-          "matchingColumns": [],
-          "schema": [
-            {
-              "id": "message_id",
-              "displayName": "message_id",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "phone",
-              "displayName": "phone",
-              "required": false,
-              "defaultMatch": true,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "source",
-              "displayName": "source",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            },
-            {
-              "id": "sent_at",
-              "displayName": "sent_at",
-              "required": false,
-              "defaultMatch": false,
-              "type": "string",
-              "display": true
-            }
-          ]
-        },
-        "options": {}
-      },
-      "id": "458cbd36-b64f-4d1f-be48-4d39f55fc933",
-      "name": "Sheets: Append Bot Outbound",
-      "type": "n8n-nodes-base.googleSheets",
-      "typeVersion": 4.4,
-      "position": [
-        -3632,
-        2000
-      ],
-      "credentials": {
-        "googleSheetsOAuth2Api": {
-          "id": "HL2oexu75XGQWtzz",
-          "name": "Google Sheets account"
-        }
-      }
-    },
-    {
-      "parameters": {},
-      "id": "61feb963-03ad-41f7-bd17-8e64c36692ac",
-      "name": "No Op: No Outbound Id",
-      "type": "n8n-nodes-base.noOp",
-      "typeVersion": 1,
-      "position": [
-        -3856,
-        2096
-      ]
-    },
-    {
-      "parameters": {
         "method": "POST",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/message",
         "sendBody": true,
@@ -1616,7 +756,7 @@
           "timeout": 20000
         }
       },
-      "id": "0929df5f-db6a-4295-8ff8-793965cb4b15",
+      "id": "dff7221e-c79d-4327-9535-16f3c2a69cdf",
       "name": "HTTP: DB Ingest Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -1655,7 +795,7 @@
           "timeout": 20000
         }
       },
-      "id": "d0c31b3f-2eb9-4da7-afe2-512ae477c565",
+      "id": "a19b82a1-32d8-4828-9daa-d1fc7cfc9e53",
       "name": "HTTP: DB Ingest Message (No Reply)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -1694,7 +834,7 @@
           "timeout": 20000
         }
       },
-      "id": "2ccceae0-cba6-401d-82f0-877638742b64",
+      "id": "53913a8f-3053-41d5-8ad1-f3dbc0f1714a",
       "name": "HTTP: DB Ingest Message (Paused)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -1733,7 +873,7 @@
           "timeout": 20000
         }
       },
-      "id": "78670bb6-0c6e-422c-99ac-d6bce95eeed2",
+      "id": "bf2e0d8c-5f0e-4c12-a65f-6089f710ae19",
       "name": "HTTP: DB Ingest Paused Chat",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -1769,7 +909,7 @@
           "timeout": 20000
         }
       },
-      "id": "18d2290d-63b2-4bda-ac4b-37f26f8e8e2b",
+      "id": "28cb85dc-085a-4e18-9a27-9378c798cca0",
       "name": "HTTP: Read Paused Chats (DB)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -1809,7 +949,7 @@
           "timeout": 20000
         }
       },
-      "id": "ae3a3384-cf8b-4bf6-86f5-15e4f75ea249",
+      "id": "2bbdb50e-721a-4363-94eb-8b5a2b52c3b8",
       "name": "HTTP: Read Paused Chats Handoff (DB)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
@@ -1828,7 +968,7 @@
       "parameters": {
         "jsCode": "const data = $input.first().json || {};\nconst rows = Array.isArray(data.rows) ? data.rows : [];\nif (!rows.length) {\n  return [{ json: { phone: '', active: 'FALSE', expires_at: '', _empty: true } }];\n}\nreturn rows.map((r) => ({\n  json: {\n    ...r,\n    active: r.active === true || String(r.active ?? '').trim().toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE'\n  }\n}));"
       },
-      "id": "a409caf0-18d8-469b-b5f5-750b3ca7a02f",
+      "id": "6d133ebf-a94b-4b15-9eb5-ccf9bccd2672",
       "name": "Code: Flatten Paused Rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
@@ -1836,6 +976,151 @@
         -5408,
         1520
       ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/message-log/recent?limit=800",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "id": "a1000001-0000-4000-8000-000000000001",
+      "name": "HTTP: Read Message Log (DB)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -4976,
+        1712
+      ],
+      "alwaysOutputData": true,
+      "settings": {
+        "alwaysOutputData": true
+      },
+      "notesInFlow": true,
+      "notes": "Dedup من yassmin.message_log — يتطلب N8N secret أو anon كما في ingest."
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json || {};\nconst rows = Array.isArray(data.rows) ? data.rows : [];\nreturn rows.map((r) => ({ json: r }));"
+      },
+      "id": "a1000002-0000-4000-8000-000000000002",
+      "name": "Code: Flatten Message Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -4864,
+        1712
+      ],
+      "notes": "يحوّل { rows } إلى عناصر متعددة كما كان يفعل شيت message_log."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/bot-outbound/recent?limit=3500",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 25000
+        }
+      },
+      "id": "a1000003-0000-4000-8000-000000000003",
+      "name": "HTTP: Read Bot Outbound (DB)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -5760,
+        2016
+      ],
+      "alwaysOutputData": true,
+      "settings": {
+        "alwaysOutputData": true
+      },
+      "notesInFlow": true,
+      "notes": "للمقارنة مع message_id الصادر (بديل شيت bot_outbound)."
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json || {};\nconst rows = Array.isArray(data.rows) ? data.rows : [];\nreturn rows.map((r) => ({ json: r }));"
+      },
+      "id": "a1000004-0000-4000-8000-000000000004",
+      "name": "Code: Flatten Bot Outbound",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5648,
+        2016
+      ]
+    },
+    {
+      "parameters": {},
+      "id": "a1000005-0000-4000-8000-000000000005",
+      "name": "No Op: Email leads (deferred)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -5200,
+        1200
+      ],
+      "notesInFlow": true,
+      "notes": "فرع الإيميل: لاحقًا POST إلى Edge أو جدول email_leads — لا Google Sheets."
+    },
+    {
+      "parameters": {},
+      "id": "a1000006-0000-4000-8000-000000000006",
+      "name": "No Op: Phone lead (deferred)",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -4752,
+        1380
+      ],
+      "notesInFlow": true,
+      "notes": "فرع الهاتف بدون إيميل — أوقفنا شيت Append."
+    },
+    {
+      "parameters": {},
+      "id": "a1000007-0000-4000-8000-000000000007",
+      "name": "No Op: Outbound logged in Supabase via ingest",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -4300,
+        1712
+      ],
+      "notes": "كانت Sheets Append Bot/Log — التسجيل عبر HTTP: DB Ingest Message."
     }
   ],
   "connections": {
@@ -1895,7 +1180,18 @@
         ]
       ]
     },
-    "Sheets: Read Keywords": {
+    "HTTP: Read Keywords (DB)": {
+      "main": [
+        [
+          {
+            "node": "Code: Keywords DB to Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Keywords DB to Rows": {
       "main": [
         [
           {
@@ -1921,7 +1217,7 @@
       "main": [
         [
           {
-            "node": "Sheets: Read Full Log",
+            "node": "HTTP: Read Message Log (DB)",
             "type": "main",
             "index": 0
           }
@@ -1929,17 +1225,6 @@
         [
           {
             "node": "No Op: No Reply",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Sheets: Read Full Log": {
-      "main": [
-        [
-          {
-            "node": "Code: Dedup & Volume Check",
             "type": "main",
             "index": 0
           }
@@ -1986,17 +1271,6 @@
         ]
       ]
     },
-    "Code: Resolve LID Phone": {
-      "main": [
-        [
-          {
-            "node": "HTTP: Send Reply",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "HTTP: Send Reply": {
       "main": [
         [
@@ -2028,7 +1302,7 @@
       "main": [
         [
           {
-            "node": "Sheets: Read Email Leads",
+            "node": "No Op: Email leads (deferred)",
             "type": "main",
             "index": 0
           }
@@ -2046,7 +1320,7 @@
       "main": [
         [
           {
-            "node": "Sheets: Append No Email Lead",
+            "node": "No Op: Phone lead (deferred)",
             "type": "main",
             "index": 0
           }
@@ -2054,46 +1328,6 @@
         [
           {
             "node": "No Op: No Email",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Sheets: Read Email Leads": {
-      "main": [
-        [
-          {
-            "node": "Code: Email Upsert Logic",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Code: Email Upsert Logic": {
-      "main": [
-        [
-          {
-            "node": "IF: Email Exists?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "IF: Email Exists?": {
-      "main": [
-        [
-          {
-            "node": "Sheets: Update Email Lead",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Sheets: Append Email Lead",
             "type": "main",
             "index": 0
           }
@@ -2122,18 +1356,7 @@
       "main": [
         [
           {
-            "node": "Sheets: Read Bot Outbound",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Sheets: Read Bot Outbound": {
-      "main": [
-        [
-          {
-            "node": "Code: Is Bot Own Message?",
+            "node": "HTTP: Read Bot Outbound (DB)",
             "type": "main",
             "index": 0
           }
@@ -2169,25 +1392,9 @@
         ]
       ]
     },
-    "Sheets: Read Paused Chats Handoff": {
-      "main": [
-        [
-          {
-            "node": "Code: Build Pause Row",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "Code: Build Pause Row": {
       "main": [
         [
-          {
-            "node": "Sheets: Upsert Paused Chat",
-            "type": "main",
-            "index": 0
-          },
           {
             "node": "HTTP: DB Ingest Paused Chat",
             "type": "main",
@@ -2218,7 +1425,7 @@
         ],
         [
           {
-            "node": "Sheets: Read Keywords",
+            "node": "HTTP: Read Keywords (DB)",
             "type": "main",
             "index": 0
           },
@@ -2245,36 +1452,14 @@
       "main": [
         [
           {
-            "node": "Sheets: Append Bot Outbound",
+            "node": "No Op: Outbound logged in Supabase via ingest",
             "type": "main",
             "index": 0
           }
         ],
         [
           {
-            "node": "No Op: No Outbound Id",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Sheets: Append Bot Outbound": {
-      "main": [
-        [
-          {
-            "node": "Sheets: Append Log",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "No Op: No Outbound Id": {
-      "main": [
-        [
-          {
-            "node": "Sheets: Append Log",
+            "node": "No Op: Outbound logged in Supabase via ingest",
             "type": "main",
             "index": 0
           }
@@ -2334,6 +1519,65 @@
             "index": 0
           }
         ]
+      ]
+    },
+    "HTTP: Read Message Log (DB)": {
+      "main": [
+        [
+          {
+            "node": "Code: Flatten Message Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Flatten Message Log": {
+      "main": [
+        [
+          {
+            "node": "Code: Dedup & Volume Check",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Read Bot Outbound (DB)": {
+      "main": [
+        [
+          {
+            "node": "Code: Flatten Bot Outbound",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Flatten Bot Outbound": {
+      "main": [
+        [
+          {
+            "node": "Code: Is Bot Own Message?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Op: Email leads (deferred)": {
+      "main": [
+        []
+      ]
+    },
+    "No Op: Phone lead (deferred)": {
+      "main": [
+        []
+      ]
+    },
+    "No Op: Outbound logged in Supabase via ingest": {
+      "main": [
+        []
       ]
     }
   },

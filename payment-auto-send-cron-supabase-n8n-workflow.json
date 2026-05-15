@@ -18,7 +18,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api?pending_whatsapp=1&limit=20",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || ($env.SUPABASE_URL ? String($env.SUPABASE_URL).replace(/\\/+$/, '') + '/functions/v1' : '') || 'https://elcofahsbznfalrbjmfo.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api?pending_whatsapp=1&limit=20",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -38,7 +38,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api/products",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || ($env.SUPABASE_URL ? String($env.SUPABASE_URL).replace(/\\/+$/, '') + '/functions/v1' : '') || 'https://elcofahsbznfalrbjmfo.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api/products",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -58,7 +58,7 @@
     {
       "parameters": {
         "method": "GET",
-        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-dashboard-api/paused-chats",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || ($env.SUPABASE_URL ? String($env.SUPABASE_URL).replace(/\\/+$/, '') + '/functions/v1' : '') || 'https://elcofahsbznfalrbjmfo.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-dashboard-api/paused-chats",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -175,7 +175,7 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api/{{ encodeURIComponent($json.form_timestamp) }}",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || ($env.SUPABASE_URL ? String($env.SUPABASE_URL).replace(/\\/+$/, '') + '/functions/v1' : '') || 'https://elcofahsbznfalrbjmfo.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api/{{ encodeURIComponent($json.form_timestamp) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -198,7 +198,7 @@
     {
       "parameters": {
         "method": "PATCH",
-        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api/{{ encodeURIComponent($json.form_timestamp) }}",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || ($env.SUPABASE_URL ? String($env.SUPABASE_URL).replace(/\\/+$/, '') + '/functions/v1' : '') || 'https://elcofahsbznfalrbjmfo.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api/{{ encodeURIComponent($json.form_timestamp) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [

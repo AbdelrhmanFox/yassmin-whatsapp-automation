@@ -36,6 +36,19 @@ const kwNewActive = document.getElementById('kwNewActive');
 const kwNewTrigger = document.getElementById('kwNewTrigger');
 const kwNewReply = document.getElementById('kwNewReply');
 const kwAddBtn = document.getElementById('kwAddBtn');
+const kwEditModal = document.getElementById('kwEditModal');
+const kwEditId = document.getElementById('kwEditId');
+const kwEditOrder = document.getElementById('kwEditOrder');
+const kwEditActive = document.getElementById('kwEditActive');
+const kwEditKeyword = document.getElementById('kwEditKeyword');
+const kwEditReply = document.getElementById('kwEditReply');
+const kwEditSave = document.getElementById('kwEditSave');
+const kwEditCancel = document.getElementById('kwEditCancel');
+const kwEditDelete = document.getElementById('kwEditDelete');
+const kwEditCloseX = document.getElementById('kwEditCloseX');
+
+/** نسخة محلية من آخر تحميل لتعبئة نافذة التعديل */
+let keywordsCache = [];
 
 const STATUS_LABELS = {
   pending_review: 'بانتظار المراجعة',
@@ -48,8 +61,7 @@ const STATUS_LABELS = {
 
 const PROVIDER_LABELS = {
   supabase: 'Supabase',
-  'supabase-edge': 'Supabase Edge',
-  sheets: 'Google Sheets'
+  'supabase-edge': 'Supabase Edge'
 };
 
 const MSG_STATUS_LABELS = {
@@ -75,6 +87,23 @@ function showToast(message, type = 'ok') {
   toastEl.classList.remove('hidden');
   clearTimeout(showToast._t);
   showToast._t = setTimeout(() => toastEl.classList.add('hidden'), 3500);
+}
+
+function escapeAttr(s) {
+  return String(s ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function keywordPreviewText(s, maxLen) {
+  const t = String(s ?? '')
+    .replace(/\r\n/g, '\n')
+    .replace(/\n+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+  if (t.length <= maxLen) return t;
+  return `${t.slice(0, maxLen - 1)}…`;
 }
 
 function escapeHtml(s) {
@@ -236,7 +265,7 @@ async function onToggleDone(input) {
       headers: apiHeaders(),
       body: JSON.stringify({ done, resetWhatsapp: true })
     });
-    const data = await res.json();
+  const data = await res.json();
     if (!res.ok || !data.ok) {
       throw new Error(data.error || 'فشل التحديث');
     }
@@ -272,7 +301,7 @@ async function onSendNow(btn) {
       headers: apiHeaders(),
       body: JSON.stringify({ form_timestamp: id })
     });
-    const data = await res.json();
+  const data = await res.json();
     if (!res.ok || !data.ok) {
       throw new Error(data.message || data.error || 'فشل الإرسال');
     }
@@ -295,19 +324,16 @@ async function refreshEnvBanner() {
   try {
     const res = await fetch('/api/health');
     const d = await res.json();
-    const provider = d.databaseProvider || '—';
-    const connected = d.supabaseConnected || d.sheetsConnected;
+    const connected = Boolean(d.supabaseConnected);
 
     envBanner.className = `env-banner ${connected ? 'env-banner--ok' : 'env-banner--warn'}`;
 
-    if (connected && provider === 'supabase') {
+    if (connected) {
       envBanner.innerHTML = `
         <strong>متصل بـ Supabase</strong> — جدول <code>yassmin.payments</code>
         ${d.supabaseEdgePayments ? ' عبر Edge Function' : ''}.
         التعديلات فورية. استخدمي <strong>إرسال الآن</strong> للإرسال الفوري، أو انتظري الكرون كل <strong>30 دقيقة</strong>.
         <br><small>اللوحة: <a href="https://yassmin-whatsapp-automation.vercel.app" target="_blank" rel="noopener">yassmin-whatsapp-automation.vercel.app</a></small>`;
-    } else if (connected && provider === 'sheets') {
-      envBanner.innerHTML = `<strong>وضع Google Sheets</strong> — يُفضّل الترحيل إلى Supabase؛ تبويب «ردود البوت» يعمل مع Supabase فقط.`;
     } else {
       envBanner.innerHTML = `<strong>غير متصل بقاعدة البيانات</strong> — راجع متغيرات Vercel: <code>SUPABASE_URL</code> و <code>SUPABASE_PAYMENTS_FUNCTION_URL</code>.`;
     }
@@ -351,8 +377,8 @@ function renderMessagesTable(threads) {
     btn.addEventListener('click', (ev) => {
       ev.stopPropagation();
       onRoutingAction(btn);
-    });
   });
+});
   messagesBody.querySelectorAll('tr.msg-thread-row').forEach((tr) => {
     tr.addEventListener('click', () => openMessageThread(tr.getAttribute('data-phone')));
   });
@@ -496,7 +522,8 @@ async function loadKeywords() {
     if (!res.ok || !data.ok) {
       throw new Error(data.error || 'فشل تحميل الردود');
     }
-    renderKeywordsTable(data.keywords || []);
+    keywordsCache = data.keywords || [];
+    renderKeywordsTable(keywordsCache);
   } catch (e) {
     keywordsBody.innerHTML = `<tr><td colspan="5" class="empty error">${escapeHtml(e.message)}</td></tr>`;
     showToast(e.message, 'err');
@@ -515,43 +542,89 @@ function renderKeywordsTable(rows) {
       const id = escapeHtml(row.id);
       const ord = Number(row.sort_order) || 0;
       const active = row.active !== false;
-      const kw = escapeHtml(row.keyword || '');
-      const rep = escapeHtml(row.reply || '');
+      const kwRaw = row.keyword || '';
+      const repRaw = row.reply || '';
+      const kwPrev = escapeHtml(keywordPreviewText(kwRaw, 96));
+      const repPrev = escapeHtml(keywordPreviewText(repRaw, 140));
+      const titleKw = escapeAttr(kwRaw.slice(0, 500));
+      const titleRep = escapeAttr(repRaw.slice(0, 500));
       return `<tr data-kw-id="${id}">
-        <td><input type="number" class="kw-order" data-field="sort_order" value="${ord}" aria-label="ترتيب" /></td>
-        <td><input type="checkbox" data-field="active" ${active ? 'checked' : ''} aria-label="مفعّل" /></td>
-        <td><textarea class="input-textarea" data-field="keyword" rows="2">${kw}</textarea></td>
-        <td><textarea class="input-textarea" data-field="reply" rows="4">${rep}</textarea></td>
-        <td>
-          <button type="button" class="btn-sm btn-kw-save" data-id="${id}">حفظ</button>
-          <button type="button" class="btn-sm btn-kw-del danger-text" data-id="${id}">حذف</button>
+        <td class="kw-order-cell"><span class="kw-order-pill" title="يُعدّل من نافذة التعديل">${ord}</span></td>
+        <td><input type="checkbox" class="kw-active-toggle" data-id="${id}" ${active ? 'checked' : ''} aria-label="مفعّل" /></td>
+        <td class="kw-preview-cell"><p class="kw-preview" title="${titleKw}">${kwPrev || '—'}</p></td>
+        <td class="kw-preview-cell"><p class="kw-preview" title="${titleRep}">${repPrev || '—'}</p></td>
+        <td class="kw-actions-cell">
+          <div class="kw-row-actions">
+            <button type="button" class="btn-sm btn-kw-edit btn-primary" data-id="${id}">تعديل</button>
+            <button type="button" class="btn-sm btn-kw-del danger-text" data-id="${id}">حذف</button>
+          </div>
         </td>
       </tr>`;
     })
     .join('');
-
-  keywordsBody.querySelectorAll('.btn-kw-save').forEach((btn) => {
-    btn.addEventListener('click', () => onSaveKeywordRow(btn));
-  });
-  keywordsBody.querySelectorAll('.btn-kw-del').forEach((btn) => {
-    btn.addEventListener('click', () => onDeleteKeyword(btn.getAttribute('data-id')));
-  });
 }
 
-function readKeywordRow(tr) {
-  const sort_order = Number(tr.querySelector('[data-field="sort_order"]')?.value) || 0;
-  const active = Boolean(tr.querySelector('[data-field="active"]')?.checked);
-  const keyword = String(tr.querySelector('[data-field="keyword"]')?.value ?? '').trim();
-  const reply = String(tr.querySelector('[data-field="reply"]')?.value ?? '').trim();
-  return { sort_order, active, keyword, reply };
+function openKeywordModal(id) {
+  if (!kwEditModal || !id) return;
+  const row = keywordsCache.find((x) => String(x.id) === String(id));
+  if (!row) {
+    showToast('تعذر العثور على القاعدة — حدّثي القائمة', 'err');
+    return;
+  }
+  kwEditId.value = id;
+  kwEditOrder.value = Number(row.sort_order) || 0;
+  kwEditActive.checked = row.active !== false;
+  kwEditKeyword.value = row.keyword || '';
+  kwEditReply.value = row.reply || '';
+  kwEditModal.classList.remove('hidden');
+  kwEditModal.setAttribute('aria-hidden', 'false');
+  kwEditKeyword.focus();
 }
 
-async function onSaveKeywordRow(btn) {
-  const id = btn.getAttribute('data-id');
-  const tr = btn.closest('tr');
-  if (!id || !tr) return;
-  const body = readKeywordRow(tr);
-  btn.disabled = true;
+function closeKeywordModal() {
+  if (!kwEditModal) return;
+  kwEditModal.classList.add('hidden');
+  kwEditModal.setAttribute('aria-hidden', 'true');
+}
+
+async function onToggleKeywordActive(inputEl, id, active) {
+  if (!id || !inputEl) return;
+  inputEl.disabled = true;
+  try {
+    const res = await fetch(`/api/keywords?id=${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: apiHeaders(),
+      body: JSON.stringify({ active })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'فشل التحديث');
+    }
+    const r = keywordsCache.find((x) => String(x.id) === String(id));
+    if (r) r.active = active;
+    showToast(active ? 'تم التفعيل' : 'تم الإيقاف المؤقت');
+  } catch (e) {
+    inputEl.checked = !active;
+    showToast(e.message, 'err');
+  } finally {
+    inputEl.disabled = false;
+  }
+}
+
+async function saveKeywordFromModal() {
+  const id = kwEditId?.value;
+  if (!id || !kwEditSave) return;
+  const body = {
+    sort_order: Number(kwEditOrder?.value) || 0,
+    active: kwEditActive?.checked !== false,
+    keyword: String(kwEditKeyword?.value ?? '').trim(),
+    reply: String(kwEditReply?.value ?? '').trim()
+  };
+  if (!body.keyword || !body.reply) {
+    showToast('أدخل كلمات التشغيل والنص', 'err');
+    return;
+  }
+  kwEditSave.disabled = true;
   try {
     const res = await fetch(`/api/keywords?id=${encodeURIComponent(id)}`, {
       method: 'PATCH',
@@ -563,11 +636,12 @@ async function onSaveKeywordRow(btn) {
       throw new Error(data.error || 'فشل الحفظ');
     }
     showToast('تم حفظ القاعدة');
+    closeKeywordModal();
     await loadKeywords();
   } catch (e) {
     showToast(e.message, 'err');
   } finally {
-    btn.disabled = false;
+    kwEditSave.disabled = false;
   }
 }
 
@@ -583,11 +657,31 @@ async function onDeleteKeyword(id) {
       throw new Error(data.error || 'فشل الحذف');
     }
     showToast('تم الحذف');
+    if (kwEditId?.value === id) closeKeywordModal();
     await loadKeywords();
   } catch (e) {
     showToast(e.message, 'err');
   }
 }
+
+keywordsBody?.addEventListener('click', (e) => {
+  const editBtn = e.target.closest('.btn-kw-edit');
+  if (editBtn) {
+    openKeywordModal(editBtn.getAttribute('data-id'));
+    return;
+  }
+  const delBtn = e.target.closest('.btn-kw-del');
+  if (delBtn) {
+    onDeleteKeyword(delBtn.getAttribute('data-id'));
+  }
+});
+
+keywordsBody?.addEventListener('change', (e) => {
+  const t = e.target;
+  if (t.classList?.contains('kw-active-toggle')) {
+    onToggleKeywordActive(t, t.getAttribute('data-id'), t.checked);
+  }
+});
 
 async function onAddKeyword() {
   if (!kwAddBtn) return;
@@ -623,6 +717,7 @@ async function onAddKeyword() {
 }
 
 function setView(view) {
+  if (view !== 'keywords') closeKeywordModal();
   document.querySelectorAll('.nav-item').forEach((b) => b.classList.remove('active'));
   document.querySelector(`.nav-item[data-view="${view}"]`)?.classList.add('active');
   document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
@@ -664,6 +759,20 @@ document.getElementById('refreshPayments').addEventListener('click', loadPayment
 refreshMessagesBtn?.addEventListener('click', loadMessages);
 refreshKeywordsBtn?.addEventListener('click', loadKeywords);
 kwAddBtn?.addEventListener('click', onAddKeyword);
+kwEditModal?.addEventListener('click', (e) => {
+  if (e.target === kwEditModal) closeKeywordModal();
+});
+kwEditSave?.addEventListener('click', saveKeywordFromModal);
+kwEditCancel?.addEventListener('click', closeKeywordModal);
+kwEditCloseX?.addEventListener('click', closeKeywordModal);
+kwEditDelete?.addEventListener('click', () => {
+  const id = kwEditId?.value;
+  if (id) onDeleteKeyword(id);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key !== 'Escape') return;
+  if (kwEditModal && !kwEditModal.classList.contains('hidden')) closeKeywordModal();
+});
 closeThreadPanelBtn?.addEventListener('click', () => {
   threadPanel?.classList.add('hidden');
 });
@@ -715,7 +824,7 @@ document.getElementById('retryFailed').addEventListener('click', () =>
 );
 
 async function fetchHistory() {
-  const res = await fetch('/api/history');
+  const res = await fetch('/api/control');
   const text = await res.text();
   if (!res.ok) {
     historyOutput.textContent = JSON.stringify(

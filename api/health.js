@@ -1,10 +1,5 @@
-const { sheetsConfigured } = require('../dashboard/lib/google-sheets');
 const { supabaseConfigured, usePaymentsEdge, PAYMENTS_FUNCTION_URL } = require('../dashboard/lib/supabase');
-const {
-  PAYMENT_SPREADSHEET_ID,
-  PAYMENT_SHEET,
-  getProvider
-} = require('../dashboard/lib/payments-store');
+const { getProvider } = require('../dashboard/lib/payments-store');
 const { sendJson, DISABLE_AUTH } = require('./_helpers');
 
 module.exports = async (req, res) => {
@@ -20,11 +15,7 @@ module.exports = async (req, res) => {
     supabaseConnected: supabaseConfigured(),
     supabaseEdgePayments: usePaymentsEdge(),
     supabasePaymentsFunctionUrl: PAYMENTS_FUNCTION_URL ? true : false,
-    sheetsConnected: sheetsConfigured(),
     supabaseSchema: process.env.SUPABASE_SCHEMA || 'yassmin',
-    botSpreadsheetId: process.env.BOT_SPREADSHEET_ID || '1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY',
-    paymentSpreadsheetId: PAYMENT_SPREADSHEET_ID,
-    paymentSheetName: PAYMENT_SHEET,
     authDisabled: DISABLE_AUTH,
     paymentSendMode: 'vercel-evolution',
     evolutionConfigured: Boolean(process.env.EVOLUTION_API_KEY),

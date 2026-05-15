@@ -146,7 +146,12 @@ Deno.serve(async (req) => {
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
   const db = supabase.schema("yassmin");
   const url = new URL(req.url);
-  const path = url.pathname.replace(/^\/functions\/v1\/yassmin-dashboard-api/, "").replace(/^\/yassmin-dashboard-api/, "") || "/";
+  let path = url.pathname
+    .replace(/^\/functions\/v1\/yassmin-dashboard-api/, "")
+    .replace(/^\/yassmin-dashboard-api/, "")
+    .replace(/\/+$/, "")
+    .replace(/\/{2,}/g, "/");
+  if (!path) path = "/";
 
   try {
     if (req.method === "POST" && path === "/ingest/payment") {
@@ -275,6 +280,45 @@ Deno.serve(async (req) => {
         .select("phone, paused_at, last_human_at, expires_at, reason, active")
         .eq("active", true)
         .gt("expires_at", now);
+      if (error) throw error;
+      return json(200, { ok: true, rows: data || [] });
+    }
+
+    /** n8n dedup: same shape as legacy Google Sheet log (timestamp, phone, message, message_id). */
+    if (req.method === "GET" && path === "/message-log/recent") {
+      if (!requireN8n(req)) return json(401, { ok: false, error: "unauthorized" });
+      let limit = Number(url.searchParams.get("limit")) || 600;
+      if (!Number.isFinite(limit) || limit < 1) limit = 600;
+      if (limit > 2000) limit = 2000;
+      const { data, error } = await db
+        .from("message_log")
+        .select("logged_at, phone, message, message_id, keyword_matched, reply_sent, status")
+        .order("logged_at", { ascending: false })
+        .limit(limit);
+      if (error) throw error;
+      const rows = (data || []).map((r: Record<string, unknown>) => ({
+        timestamp: r.logged_at,
+        phone: String(r.phone ?? ""),
+        message: String(r.message ?? ""),
+        message_id: String(r.message_id ?? ""),
+        keyword_matched: r.keyword_matched ?? "",
+        reply_sent: r.reply_sent ?? "",
+        status: r.status ?? ""
+      }));
+      return json(200, { ok: true, rows });
+    }
+
+    /** n8n: detect outbound messages from the bot (replaces sheet bot_outbound). */
+    if (req.method === "GET" && path === "/bot-outbound/recent") {
+      if (!requireN8n(req)) return json(401, { ok: false, error: "unauthorized" });
+      let limit = Number(url.searchParams.get("limit")) || 3000;
+      if (!Number.isFinite(limit) || limit < 1) limit = 3000;
+      if (limit > 5000) limit = 5000;
+      const { data, error } = await db
+        .from("bot_outbound")
+        .select("message_id, phone, sent_at, source")
+        .order("sent_at", { ascending: false })
+        .limit(limit);
       if (error) throw error;
       return json(200, { ok: true, rows: data || [] });
     }

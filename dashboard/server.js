@@ -3,15 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const { URL } = require('url');
 
-const { sheetsConfigured } = require('./lib/google-sheets');
 const { supabaseConfigured } = require('./lib/supabase');
 const {
   listPayments,
   updatePaymentDone,
   createPayment,
   listProducts,
-  getProvider,
-  PAYMENT_SPREADSHEET_ID
+  getProvider
 } = require('./lib/payments-store');
 const { sendPaymentWhatsAppNow } = require('./lib/send-payment-whatsapp');
 const {
@@ -131,8 +129,6 @@ function handleHealth(res) {
     status: 'running',
     databaseProvider: getProvider(),
     supabaseConnected: supabaseConfigured(),
-    sheetsConnected: sheetsConfigured(),
-    paymentSpreadsheetId: PAYMENT_SPREADSHEET_ID,
     controlWebhookConfigured: Boolean(CONTROL_WEBHOOK_URL),
     metricsWebhookConfigured: Boolean(METRICS_WEBHOOK_URL),
     authDisabled: DISABLE_AUTH,
@@ -193,12 +189,12 @@ async function handleMetrics(res) {
           retryDueNow: data.stats.awaiting_whatsapp,
           avgLatencyMs: 0
         },
-        source: 'google_sheets',
+        source: 'supabase',
         stats: data.stats
       });
       return;
     } catch (e) {
-      sendJson(res, 400, { ok: false, error: e.message || 'sheets_unavailable' });
+      sendJson(res, 400, { ok: false, error: e.message || 'supabase_unavailable' });
       return;
     }
   }
@@ -232,10 +228,9 @@ async function handlePaymentsList(req, res) {
     sendJson(res, status, {
       ok: false,
       error: error.message,
-      hint:
-        error.message?.includes('ENOENT') || !sheetsConfigured()
-          ? 'شغّلي node setup-google-sheets.js أو npm run sync:google-sheets لربط Google'
-          : undefined
+      hint: !supabaseConfigured()
+        ? 'اضبطي SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY أو روابط دوال Edge في البيئة'
+        : undefined
     });
   }
 }
@@ -326,13 +321,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === 'POST' && url.pathname === '/api/control') {
-    await handleControl(req, res);
+  if (req.method === 'GET' && url.pathname === '/api/control') {
+    handleHistory(res);
     return;
   }
 
-  if (req.method === 'GET' && url.pathname === '/api/history') {
-    handleHistory(res);
+  if (req.method === 'POST' && url.pathname === '/api/control') {
+    await handleControl(req, res);
     return;
   }
 

@@ -10,6 +10,10 @@ scripts/.payment-export.csv
 scripts/.migration-payload.json
 *.xlsx
 ~$*.xlsx
-
-.vercel
 .env*.local
+
+# حمولات نشر Edge / MCP مؤقتة (المصدر: supabase/functions)
+mcp-payload.json
+deploy-edge-args.json
+_deploy-dash.json
+deploy-fn.json

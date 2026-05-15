@@ -8,7 +8,7 @@ const {
 
 function ensureClient() {
   if (!useSupabase() || !supabaseConfigured()) {
-    const e = new Error('Keywords تحتاج Supabase — عيّني DATABASE_PROVIDER=supabase والمفاتيح.');
+    const e = new Error('Keywords تحتاج Supabase — عيّني SUPABASE_URL والمفاتيح (انظري .env.example).');
     e.code = 'CONFIG';
     throw e;
   }

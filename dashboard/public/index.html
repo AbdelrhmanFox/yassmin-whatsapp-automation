@@ -184,9 +184,9 @@
                   <tr>
                     <th style="width: 4rem">ترتيب</th>
                     <th style="width: 3.5rem">مفعل</th>
-                    <th>كلمات التشغيل</th>
-                    <th>نص الرد</th>
-                    <th style="width: 7rem">إجراءات</th>
+                    <th>كلمات التشغيل <span class="th-hint">(معاينة)</span></th>
+                    <th>نص الرد <span class="th-hint">(معاينة)</span></th>
+                    <th style="width: 9.5rem">إجراءات</th>
                   </tr>
                 </thead>
                 <tbody id="keywordsBody">
@@ -246,6 +246,37 @@
           <pre id="resultOutput" class="compact-pre"></pre>
         </section>
       </main>
+    </div>
+
+    <div id="kwEditModal" class="modal-backdrop hidden" aria-hidden="true">
+      <div class="modal-panel modal-panel--keyword" role="dialog" aria-modal="true" aria-labelledby="kwEditTitle">
+        <div class="modal-head">
+          <h2 id="kwEditTitle" class="modal-title">تعديل القاعدة</h2>
+          <button type="button" id="kwEditCloseX" class="modal-close" aria-label="إغلاق">×</button>
+        </div>
+        <div class="modal-body">
+          <input type="hidden" id="kwEditId" />
+          <div class="kw-modal-grid">
+            <label class="kw-modal-field">ترتيب
+              <input id="kwEditOrder" type="number" class="input-inline" />
+            </label>
+            <label class="check-label kw-modal-check"><input id="kwEditActive" type="checkbox" /> مفعّل</label>
+            <label class="full-row">كلمات التشغيل (مفصولة بفاصلة)
+              <textarea id="kwEditKeyword" rows="4" class="input-textarea" dir="auto"></textarea>
+            </label>
+            <label class="full-row">نص الرد
+              <textarea id="kwEditReply" rows="10" class="input-textarea" dir="auto"></textarea>
+            </label>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button type="button" id="kwEditDelete" class="btn-sm danger">حذف القاعدة</button>
+          <div class="modal-foot-actions">
+            <button type="button" id="kwEditCancel" class="btn-sm secondary">إلغاء</button>
+            <button type="button" id="kwEditSave" class="btn-primary">حفظ</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div id="toast" class="toast hidden" role="alert"></div>
