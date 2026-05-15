@@ -411,7 +411,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  if (req.method === 'GET' && url.pathname === '/api/messages/thread') {
+  if (req.method === 'GET' && url.pathname === '/api/messages-thread') {
     if (!isAuthorized(req)) {
       sendJson(res, 401, { ok: false, error: 'unauthorized' });
       return;

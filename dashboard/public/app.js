@@ -398,7 +398,7 @@ async function openMessageThread(phone) {
   threadPanel.classList.remove('hidden');
   threadPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   try {
-    const res = await fetch(`/api/messages/thread?phone=${encodeURIComponent(phone)}`, {
+    const res = await fetch(`/api/messages-thread?phone=${encodeURIComponent(phone)}`, {
       headers: apiHeaders()
     });
     const data = await res.json();
