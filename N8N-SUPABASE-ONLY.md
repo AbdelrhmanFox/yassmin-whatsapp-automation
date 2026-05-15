@@ -42,6 +42,37 @@
 - HTTP سريع: `GET https://<ref>.supabase.co/functions/v1/yassmin-dashboard-api/keywords` يجب أن يعيد `200` و`"ok":true`.
 - مسارات n8n المحمية: `GET .../message-log/recent` و`GET .../bot-outbound/recent` تتطلب نفس صلاحيات `requireN8n` (anon في الهيدر، أو `x-n8n-secret` إذا ضُبط `N8N_WEBHOOK_SECRET`).
 
+## لا يصل أي شيء (لا تنفيذات n8n ولا سطر في `message_log`)
+
+هذا يعني غالبًا أن **Evolution لا يضرب رابط n8n أصلًا**، أو الوركفلو **غير مفعّل**، أو الرابط **Test** بدل **Production**.
+
+### تحقق سريع (بالترتيب)
+
+1. **n8n → Workflows → البوت → Active (شغّال)**  
+   بدون التفعيل، رابط **Production** لا يعمل.
+
+2. **عقدة `Webhook: Receive WA Message` → انسخي «Production URL»**  
+   - **n8n Cloud:** عادة `https://اسمك.app.n8n.cloud/webhook/whatsapp`  
+   - **self-hosted:** يجب أن يكون الرابط **عامًا على الإنترنت** (HTTPS) وليس `localhost` — Evolution لا يستطيع الوصول لجهازك الداخلي بدون نفق (tunnel).
+
+3. **لا تخلطي بين رابط Test و Production**  
+   رابط **Test** يعمل فقط عندما تفتحي الوركفلو في المحرّر وتنتظري الاستماع. إيفوليوشن يجب أن يشير إلى **Production** بعد التفعيل.
+
+4. **Evolution → Webhook / Events**  
+   تأكدي أن الحدث **messages.upsert** (أو ما يعادله عندكم) يُرسل **POST** إلى نفس **Production URL** أعلاه، ونوع المحتوى **JSON** إن وُجد الخيار.
+
+5. **جرّبي من الطرفية (اختياري)**  
+   استبدلي الرابط بالـ Production الحقيقي:
+   ```bash
+   curl -sS -X POST "https://YOUR-N8N/webhook/whatsapp" -H "Content-Type: application/json" -d "{\"body\":{\"data\":{\"key\":{\"fromMe\":false,\"remoteJid\":\"201234567890@s.whatsapp.net\",\"id\":\"test-curl-1\"},\"message\":{\"conversation\":\"ping\"},\"messageTimestamp\":$(date +%s)}}}"
+   ```  
+   بعدها يجب أن يظهر **تنفيذ جديد** في n8n → Executions.
+
+6. **إن ظهر تنفيذ لكن لا يظهر شيء في Supabase**  
+   افتحي التنفيذ وانظري لعُقد **`HTTP: DB Ingest Message*`** (حمراء؟) — قد يكون **401** على `ingest` (مفتاح anon) أو خطأ شبكة. العُقد الجديدة تستخدم `continueOnFail`؛ **الخطأ يظهر داخل العقدة** حتى لا يوقف المسار.
+
+---
+
 ## خطوات التشغيل
 
 1. استوردي `whatsapp-bot-yassmin-supabase-only.json` في n8n وفعّلي الـ workflow.
