@@ -41,6 +41,8 @@
 
 ## متغيرات بيئة n8n
 
+> **تنفيذ Test (`webhook-test`)**: n8n يمنع استخدام **`$env.*`** في وضع الاختبار (`access to env vars denied`). وركفلو **`whatsapp-bot-yassmin-supabase-only.json`** في الريبو يستخدم **قيمًا ثابتة** في الهيدرز وEvolution حتى يعمل الاختبار من Postman أو «Listen for test event» بدون أخطاء. لتغيير المفاتيح لبيئة أخرى عدّلي العُقد يدويًا في n8n أو استخدمي **Credentials** داخل n8n.
+
 - `SUPABASE_ANON_KEY` — مطلوب لجميع طلبات `yassmin-dashboard-api` و`yassmin-payments-api`.
 - `SUPABASE_URL` (مثل `https://<ref>.supabase.co`) — يُستخدم تلقائيًا في **كرون الدفعات** لبناء `.../functions/v1` إن لم تُضبط `YASSMIN_SUPABASE_FUNCTIONS_URL`.
 - `YASSMIN_SUPABASE_FUNCTIONS_URL` (اختياري) — إن وُجدت، تُستخدم كاملة لقاعدة المسارات (مثل `https://<ref>.supabase.co/functions/v1`) وتتقدّم على `SUPABASE_URL`.
