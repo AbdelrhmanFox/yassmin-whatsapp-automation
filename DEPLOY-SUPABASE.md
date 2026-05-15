@@ -106,3 +106,22 @@ Header: Accept-Profile: yassmin
 
 1. **مؤقت**: الفورم يبقى على Sheets + `npm run migrate:sheets-to-supabase` دورياً.
 2. **نهائي**: Webhook من n8n عند إرسال الفورم → `INSERT` في `yassmin.payments`.
+
+## أخطاء Vercel / النشر — لماذا تتكرر؟
+
+1. **قاعدة مجلد `api/`**  
+   كل ملف `api/**/*.js` يُعامَل كـ **Serverless Function** ولا بد أن يصدّر **معالج طلب واحد** (`module.exports = async (req, res) => { ... }`).  
+   أي ملف تحت `api/` ليس handler (مثل مكتبة مشتركة، `lib/*.js`، سكربت مساعد) غالبًا يسبب فشل البناء مثل **Invalid serverless function** — نفس سبب نقل `action-history` خارج `api/` سابقًا.  
+   **الاستثناء الشائع:** الملفات التي اسمها يبدأ بـ **`_`** (مثل `_helpers.js`) لا تُعرَّف كـ Route في إعدادات Vercel الكلاسيكية، فتبقى للـ `require` فقط — لا تضيفي ملفات عادية تحت `api/` بدون `_`.
+
+2. **المسارات عميقة**  
+   تجنّبي تعارض الأسماء مع مجلدات (مثل مسار يتوقعه المتصفح كـ «مجلد»). حُل سابق: **`/api/messages-thread`** كملف واحد بدل `api/messages/thread.js`.
+
+3. **تشغيل محلي مقابل النشر**  
+   **`vercel dev`** و**Production** يقرآن متغيرات البيئة من لوحة Vercel؛ لو الـ env غير مضبوطة على المشروع (أو على Preview فقط) تظهر نفس الأخطاء **503 / unauthorized** رغم أن المحلي يعمل مع `.env`.
+
+4. **لوحة التحكم بعد آخر ميزات**  
+   تبويب **ردود البوت** ومسارات مثل `PATCH /api/keywords` يحتاجان **`SUPABASE_SERVICE_ROLE_KEY`** على Vercel (قراءة/كتابة `yassmin.keywords`). بدون المفتاح يظهر خطأ إعداد وليس بالضرورة فشل build.
+
+5. **Edge Functions منفصلة**  
+   تغييرات على `supabase/functions/...` **لا تُنشر مع Vercel** — لازم **`supabase functions deploy`**؛ إلا ستظل الواجهة أو n8n تضرب كودًا قديمًا على Supabase.
