@@ -1,4 +1,4 @@
-const DEFAULT_WEBHOOK_URL = 'https://n8n.growleadpro.com/webhook/yassmin-send-payment';
+const DEFAULT_WEBHOOK_URL = 'https://n8n.growleadpro.com/webhook/yassmin-payment-confirm-now';
 const WEBHOOK_URL = (process.env.N8N_PAYMENT_SEND_WEBHOOK_URL || DEFAULT_WEBHOOK_URL).trim();
 const WEBHOOK_SECRET = process.env.N8N_WEBHOOK_SECRET || '';
 

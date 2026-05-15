@@ -3,7 +3,7 @@
   "nodes": [
     {
       "parameters": {
-        "path": "yassmin-send-payment",
+        "path": "yassmin-payment-confirm-now",
         "httpMethod": "POST",
         "responseMode": "responseNode",
         "options": {}
@@ -13,8 +13,8 @@
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2.1,
       "position": [-1200, 400],
-      "webhookId": "yassmin-send-payment-001",
-      "notes": "الداشبورد يستدعيه عبر N8N_PAYMENT_SEND_WEBHOOK_URL مع { form_timestamp }"
+      "webhookId": "yassmin-payment-confirm-now-v2",
+      "notes": "Production URL: https://n8n.growleadpro.com/webhook/yassmin-payment-confirm-now — احذفي أي workflow قديم على yassmin-send-payment"
     },
     {
       "parameters": {
@@ -221,8 +221,28 @@
     },
     {
       "parameters": {
+        "jsCode": "const ext = $('Code: Extract Payment Outbound Id').first().json;\nreturn [{\n  json: {\n    ok: true,\n    sent: true,\n    message_id: String(ext.message_id || ''),\n    form_timestamp: String(ext.form_timestamp || ''),\n    phone: String(ext.phone || '')\n  }\n}];"
+      },
+      "id": "a1000016-0016-4016-8016-000000000016",
+      "name": "Code: Build Success Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 240]
+    },
+    {
+      "parameters": {
+        "jsCode": "const ext = $('Code: Extract Payment Outbound Id').first().json;\nconst prep = $('Code: Prepare Single Payment Send').first().json;\nreturn [{\n  json: {\n    ok: false,\n    sent: false,\n    form_timestamp: String(ext.form_timestamp || prep.form_timestamp || ''),\n    error: String(ext.send_error || prep.precheck_error || 'send_failed')\n  }\n}];"
+      },
+      "id": "a1000017-0017-4017-8017-000000000017",
+      "name": "Code: Build Fail Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [640, 480]
+    },
+    {
+      "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { ok: true, sent: true, message_id: $('Code: Extract Payment Outbound Id').item.json.message_id, form_timestamp: $('Code: Extract Payment Outbound Id').item.json.form_timestamp, phone: $('Code: Extract Payment Outbound Id').item.json.phone } }}",
+        "responseBody": "={{ $json }}",
         "options": {}
       },
       "id": "a1000011-0011-4011-8011-000000000011",
@@ -234,7 +254,7 @@
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { ok: false, sent: false, form_timestamp: $json.form_timestamp || $('Code: Prepare Single Payment Send').first().json.form_timestamp, error: $json.send_error || $json.precheck_error || $json.error?.message || 'send_failed' } }}",
+        "responseBody": "={{ $json }}",
         "options": { "responseCode": 422 }
       },
       "id": "a1000012-0012-4012-8012-000000000012",
@@ -300,9 +320,15 @@
       ]
     },
     "HTTP: Mark Sent (DB)": {
-      "main": [[{ "node": "Respond: Sent", "type": "main", "index": 0 }]]
+      "main": [[{ "node": "Code: Build Success Response", "type": "main", "index": 0 }]]
     },
     "HTTP: Mark Failed (DB)": {
+      "main": [[{ "node": "Code: Build Fail Response", "type": "main", "index": 0 }]]
+    },
+    "Code: Build Success Response": {
+      "main": [[{ "node": "Respond: Sent", "type": "main", "index": 0 }]]
+    },
+    "Code: Build Fail Response": {
       "main": [[{ "node": "Respond: Failed", "type": "main", "index": 0 }]]
     }
   },
