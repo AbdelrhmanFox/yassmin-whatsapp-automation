@@ -5,7 +5,7 @@ const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
     "authorization, x-client-info, apikey, content-type, x-admin-token, x-n8n-secret",
-  "Access-Control-Allow-Methods": "GET, PATCH, POST, OPTIONS"
+  "Access-Control-Allow-Methods": "GET, PATCH, POST, DELETE, OPTIONS"
 };
 
 function json(status: number, body: unknown) {
@@ -34,10 +34,22 @@ async function requireAdmin(_supabase: ReturnType<typeof createClient>, _req: Re
   return true;
 }
 
+function requireDashboardWrite(req: Request): boolean {
+  const need = norm(Deno.env.get("DASHBOARD_ADMIN_TOKEN") || "");
+  if (!need) return true;
+  return norm(req.headers.get("x-admin-token")) === need;
+}
+
 function requireN8n(req: Request) {
   const secret = Deno.env.get("N8N_WEBHOOK_SECRET") || "";
   if (!secret) return true;
-  return norm(req.headers.get("x-n8n-secret")) === secret;
+  if (norm(req.headers.get("x-n8n-secret")) === secret) return true;
+  const anon = Deno.env.get("SUPABASE_ANON_KEY") || "";
+  const auth = req.headers.get("authorization") || "";
+  const apikey = norm(req.headers.get("apikey"));
+  if (anon && norm(auth) === `Bearer ${anon}`) return true;
+  if (anon && apikey === anon) return true;
+  return false;
 }
 
 function extFromMime(mime: string) {
@@ -71,8 +83,61 @@ function deriveThreadStatus(thread: Record<string, unknown>) {
   const until = thread.human_handoff_until ? new Date(String(thread.human_handoff_until)).getTime() : 0;
   const humanActive = thread.routing_mode === "human" && (!until || until > Date.now());
   if (humanActive) return "human_handoff";
-  if (thread.last_reply_at || thread.last_status === "replied" || thread.last_status === "auto_replied") return "auto_replied";
+  if (thread.last_status === "human_handoff_skipped" || thread.last_status === "paused_skipped") {
+    return "human_handoff";
+  }
+  if (thread.last_reply_at || thread.last_status === "replied" || thread.last_status === "auto_replied") {
+    return "auto_replied";
+  }
   return "received";
+}
+
+function threadsFromMessageLog(logs: Record<string, unknown>[]) {
+  if (!logs.length) return [];
+  const sorted = [...logs].sort(
+    (a, b) => new Date(String(a.logged_at)).getTime() - new Date(String(b.logged_at)).getTime()
+  );
+  const byPhone = new Map<string, Record<string, unknown>>();
+  for (const row of sorted) {
+    const phone = normPhone(row.phone);
+    if (!phone) continue;
+    if (!byPhone.has(phone)) {
+      byPhone.set(phone, {
+        phone,
+        last_message_at: row.logged_at,
+        last_inbound_text: "",
+        last_inbound_at: null,
+        last_reply_text: "",
+        last_reply_at: null,
+        last_keyword: "",
+        routing_mode: "auto",
+        message_count: 0,
+        last_status: null,
+        human_handoff_until: null,
+        human_handoff_reason: null
+      });
+    }
+    const t = byPhone.get(phone)!;
+    t.message_count = Number(t.message_count) + 1;
+    t.last_message_at = row.logged_at;
+    const msg = norm(row.message);
+    const reply = norm(row.reply_sent);
+    if (msg) {
+      t.last_inbound_text = msg;
+      t.last_inbound_at = row.logged_at;
+    }
+    if (reply) {
+      t.last_reply_text = reply;
+      t.last_reply_at = row.logged_at;
+    }
+    if (row.keyword_matched) t.last_keyword = row.keyword_matched;
+    if (row.status) t.last_status = row.status;
+    if (row.routing_mode) t.routing_mode = row.routing_mode;
+  }
+  return Array.from(byPhone.values()).sort(
+    (a, b) =>
+      new Date(String(b.last_message_at)).getTime() - new Date(String(a.last_message_at)).getTime()
+  );
 }
 
 Deno.serve(async (req) => {
@@ -214,20 +279,96 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, rows: data || [] });
     }
 
+    if (req.method === "GET" && path === "/keywords") {
+      const { data, error } = await db
+        .from("keywords")
+        .select("*")
+        .order("sort_order", { ascending: true })
+        .order("created_at", { ascending: true });
+      if (error) throw error;
+      return json(200, { ok: true, keywords: data || [] });
+    }
+
+    if (req.method === "POST" && path === "/keywords") {
+      if (!requireDashboardWrite(req)) return json(401, { ok: false, error: "unauthorized" });
+      const body = await req.json().catch(() => ({}));
+      const keyword = norm(body.keyword);
+      const reply = norm(body.reply);
+      if (!keyword || !reply) return json(400, { ok: false, error: "keyword_and_reply_required" });
+      const row = {
+        keyword,
+        reply,
+        active: body.active !== false,
+        sort_order: Number(body.sort_order) || 0,
+        updated_at: new Date().toISOString()
+      };
+      const { data, error } = await db.from("keywords").insert(row).select("*").single();
+      if (error) throw error;
+      return json(201, { ok: true, keyword: data });
+    }
+
+    const kwPatch = path.match(/^\/keywords\/([^/]+)$/);
+    if (kwPatch && req.method === "PATCH") {
+      if (!requireDashboardWrite(req)) return json(401, { ok: false, error: "unauthorized" });
+      const id = decodeURIComponent(kwPatch[1]);
+      const body = await req.json().catch(() => ({}));
+      const patch: Record<string, unknown> = { updated_at: new Date().toISOString() };
+      if (body.keyword !== undefined) patch.keyword = norm(body.keyword);
+      if (body.reply !== undefined) patch.reply = norm(body.reply);
+      if (body.active !== undefined) patch.active = body.active === true;
+      if (body.sort_order !== undefined) patch.sort_order = Number(body.sort_order) || 0;
+      if (Object.keys(patch).length <= 1) return json(400, { ok: false, error: "empty_patch" });
+      const { data, error } = await db.from("keywords").update(patch).eq("id", id).select("*").maybeSingle();
+      if (error) throw error;
+      if (!data) return json(404, { ok: false, error: "not_found" });
+      return json(200, { ok: true, keyword: data });
+    }
+
+    if (kwPatch && req.method === "DELETE") {
+      if (!requireDashboardWrite(req)) return json(401, { ok: false, error: "unauthorized" });
+      const id = decodeURIComponent(kwPatch[1]);
+      const { data: deleted, error } = await db.from("keywords").delete().eq("id", id).select("id");
+      if (error) throw error;
+      if (!deleted?.length) return json(404, { ok: false, error: "not_found" });
+      return json(200, { ok: true, deleted: id });
+    }
+
     if (!(await requireAdmin(supabase, req))) return json(401, { ok: false, error: "unauthorized" });
 
     if (req.method === "GET" && path === "/messages") {
       const { data: threads, error } = await db.from("chat_threads").select("*").order("last_message_at", { ascending: false });
       if (error) throw error;
-      let rows = (threads || []).map((r) => ({
-        ...r,
-        status: deriveThreadStatus(r as Record<string, unknown>),
-        status_label: deriveThreadStatus(r as Record<string, unknown>) === "human_handoff" ? "تحويل لرد بشري" : deriveThreadStatus(r as Record<string, unknown>) === "auto_replied" ? "رد تلقائي" : "رسالة واردة"
-      }));
+      const mapThreadRow = (r: Record<string, unknown>) => {
+        const st = deriveThreadStatus(r);
+        return {
+          ...r,
+          status: st,
+          status_label:
+            st === "human_handoff" ? "تحويل لرد بشري" : st === "auto_replied" ? "رد تلقائي" : "رسالة واردة"
+        };
+      };
+      let rows = (threads || []).map((r) => mapThreadRow(r as Record<string, unknown>));
+      if (!threads || threads.length === 0) {
+        const { data: logForThreads, error: logErr } = await db
+          .from("message_log")
+          .select("*")
+          .order("logged_at", { ascending: false })
+          .limit(500);
+        if (logErr) throw logErr;
+        const synthetic = threadsFromMessageLog((logForThreads || []) as Record<string, unknown>[]);
+        if (synthetic.length) rows = synthetic.map((r) => mapThreadRow(r));
+      }
       const q = norm(url.searchParams.get("q")).toLowerCase();
       const status = url.searchParams.get("status") || "all";
       if (status !== "all") rows = rows.filter((r) => r.status === status);
-      if (q) rows = rows.filter((r) => [r.phone, r.last_inbound_text, r.last_reply_text].join(" ").toLowerCase().includes(q));
+      if (q) {
+        rows = rows.filter((r) =>
+          [r.phone, r.last_inbound_text, r.last_reply_text, r.last_keyword]
+            .join(" ")
+            .toLowerCase()
+            .includes(q)
+        );
+      }
       const { data: recent } = await db.from("message_log").select("*").order("logged_at", { ascending: false }).limit(60);
       return json(200, {
         ok: true,

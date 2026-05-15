@@ -19,6 +19,7 @@
         <nav class="nav">
           <button type="button" class="nav-item active" data-view="payments">عمليات الدفع</button>
           <button type="button" class="nav-item" data-view="messages">الرسائل</button>
+          <button type="button" class="nav-item" data-view="keywords">ردود البوت</button>
           <button type="button" class="nav-item" data-view="operations">تحكم الأتمتة</button>
         </nav>
         <div class="sidebar-foot">
@@ -30,13 +31,6 @@
             >فتح Supabase ↗</a
           >
           <a id="publicFormLink" href="/form.html" target="_blank" rel="noopener">نموذج الدفع للعملاء ↗</a>
-          <a
-            id="sheetLink"
-            href="https://docs.google.com/spreadsheets/d/1DoDcs3QnwDmkNim8OKQ7wm3I8JJoQiwhIcHamHo6a8w"
-            target="_blank"
-            rel="noopener"
-            >شيت الدفع (نسخة احتياطية) ↗</a
-          >
         </div>
       </aside>
 
@@ -170,6 +164,50 @@
               <button type="button" id="closeThreadPanel" class="btn-sm">إغلاق ❌</button>
             </div>
             <div id="threadBubbles" class="thread-bubbles"></div>
+          </div>
+        </section>
+
+        <section id="view-keywords" class="view hidden">
+          <p class="view-hint">
+            القواعد مُخزَّنة في <code>yassmin.keywords</code> على Supabase (نفس منطق تبويب «keywords» القديم في
+            الشيت). افصلي عدة كلمات بفواصل؛ احرصي أن صف <strong>default</strong> يبقى الأخير ليكون ردًا احتياطيًا.
+            في n8n استبدلي عقدة قراءة الشيت بـ
+            <code>GET …/yassmin-dashboard-api/keywords</code>.
+          </p>
+          <div class="toolbar card">
+            <button type="button" id="refreshKeywords" class="btn-primary">تحديث القائمة</button>
+          </div>
+          <div class="card table-card">
+            <div class="table-wrap">
+              <table class="data-table data-table--keywords">
+                <thead>
+                  <tr>
+                    <th style="width: 4rem">ترتيب</th>
+                    <th style="width: 3.5rem">مفعل</th>
+                    <th>كلمات التشغيل</th>
+                    <th>نص الرد</th>
+                    <th style="width: 7rem">إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody id="keywordsBody">
+                  <tr><td colspan="5" class="empty">جاري التحميل…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+          <div class="card" style="margin-top: 16px">
+            <h3 style="margin-top: 0">إضافة قاعدة جديدة</h3>
+            <div class="keywords-form-grid">
+              <label>ترتيب <input id="kwNewOrder" type="number" value="0" class="input-inline" /></label>
+              <label class="check-label"><input id="kwNewActive" type="checkbox" checked /> مفعّل</label>
+              <label class="full-row">كلمات التشغيل (مفصولة بفاصلة)
+                <textarea id="kwNewTrigger" rows="2" class="input-textarea" placeholder="مثال: مرحبا, hello"></textarea>
+              </label>
+              <label class="full-row">نص الرد
+                <textarea id="kwNewReply" rows="4" class="input-textarea" placeholder="النص الذي يُرسل على واتساب"></textarea>
+              </label>
+              <button type="button" id="kwAddBtn" class="btn-primary">إضافة</button>
+            </div>
           </div>
         </section>
 

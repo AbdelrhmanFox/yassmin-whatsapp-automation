@@ -1,11 +1,11 @@
-# WhatsApp Bot Automation (n8n + Evolution + Google Sheets)
+# WhatsApp Bot Automation (n8n + Evolution + **Supabase**)
 
-Production-ready WhatsApp auto-reply workflow with keyword matching, anti-ban protections, deduplication, message logging, and email-based lead capture.
+Production-ready WhatsApp auto-reply workflow with keyword matching, anti-ban protections, deduplication, message logging, and email-based lead capture. **Google Sheets** دعم احتياطي قديم فقط (`DATABASE_PROVIDER=sheets`) — المسار المُوصى به هو Supabase + لوحة التحكم.
 
 ## Stack
 - `n8n` (workflow engine)
 - `Evolution API` (WhatsApp transport)
-- `Google Sheets` (keywords + audit logs)
+- `Supabase` schema **`yassmin`** (دفعات، `keywords`، `message_log`، …) — إدارة الردود الثابتة من تبويب **«ردود البوت»** في `dashboard/`
 
 ## Files
 - **`full-whatsapp-bot-yassmin-workflow.json`** — **ملف الإنتاج الوحيد**: استورديه في n8n فقط. يضم البوت + الكلمات + اللوج + الليدز + كرون تأكيد الدفع وPDF في workflow واحد. يُحدَّث بتشغيل `npm run build:full-workflow`.
@@ -118,7 +118,9 @@ Headers:
 
 ### Payment / Done confirmation (included in `full-whatsapp-bot-yassmin-workflow.json`)
 
-كل **30 دقيقة**: قراءة **`عمليات الدفع`** + تبويب **`product_pdf_map`** (دمج ثم كود) → تصفية الصفوف اللي فيها **Done** وليس `whatsapp_status=sent` → إرسال **`تم تأكيد الدفع.`** + **رابط PDF** حسب عمود الفورم **`product_code`** (قيم مطابقة لـ `product_code` في `product_pdf_map`) عبر Evolution → تحديث `whatsapp_status` / `whatsapp_last_error` / `whatsapp_sent_at` بمطابقة **`طابع زمني`**. لو الكود غير معروف في الخريطة تُرسل رسالة التأكيد مع تنبيه بدون رابط.
+كل **30 دقيقة** (مسار **Google Sheets** داخل نفس الملف): قراءة **`عمليات الدفع`** + تبويب **`product_pdf_map`** (دمج ثم كود) → تصفية الصفوف اللي فيها **Done** وليس `whatsapp_status=sent` → إرسال **`تم تأكيد الدفع.`** + **رابط PDF** حسب عمود الفورم **`product_code`** (قيم مطابقة لـ `product_code` في `product_pdf_map`) عبر Evolution → تحديث `whatsapp_status` / `whatsapp_last_error` / `whatsapp_sent_at` بمطابقة **`طابع زمني`**. لو الكود غير معروف في الخريطة تُرسل رسالة التأكيد مع تنبيه بدون رابط.
+
+**لو الدفعات على Supabase (لوحة التحكم):** استوردي **`payment-auto-send-cron-supabase-n8n-workflow.json`** وفعليه في n8n، وعطّلي كرون الشيت أعلاه لتجنّب الإرسال المزدوج. التفاصيل في `DEPLOY-SUPABASE.md` (باراميتر `GET .../yassmin-payments-api?pending_whatsapp=1`).
 
 عقدة **Code** في مسار الدفع **لا تستخدم** `$env` ولا `process` (لتجنب أخطاء task runner). عقدة **`HTTP: Send Payment Confirmation`** تستخدم نفس **header `apikey`** الثابت الموجود في عقدة **`HTTP: Send Reply`** (يُنسخ تلقائيًا عند `npm run build:full-workflow`). لا تُستخدم تعبيرات `$env` في مسار الدفع.
 

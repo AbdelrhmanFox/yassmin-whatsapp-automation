@@ -18,8 +18,7 @@ module.exports = async (req, res) => {
       sendJson(res, 500, {
         ok: false,
         error: error.message,
-        hint:
-          'Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (preferred) or GOOGLE_SERVICE_ACCOUNT_JSON for Sheets fallback.'
+        hint: 'تأكدي من SUPABASE_URL و SUPABASE_SERVICE_ROLE_KEY (أو Edge للدفع فقط).'
       });
     }
     return;

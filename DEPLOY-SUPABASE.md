@@ -8,7 +8,7 @@
 |--------|--------|
 | `yassmin.payments` | عمليات الدفع + حالة واتساب |
 | `yassmin.product_pdf_map` | ربط `product_code` → رابط PDF أو [مجلد Google Drive](https://drive.google.com) |
-| `yassmin.keywords` | ردود البوت |
+| `yassmin.keywords` | ردود البوت — من اللوحة **ردود البوت** أو `GET …/yassmin-dashboard-api/keywords` لـ n8n |
 | `yassmin.message_log` | سجل الرسائل |
 | `yassmin.email_leads` | ليدز الإيميل |
 | `yassmin.paused_chats` | إيقاف البوت عند تدخل بشري |
@@ -47,6 +47,14 @@ DASHBOARD_DISABLE_AUTH=false
 
 لوحة التحكم تستخدم Supabase تلقائياً عند وجود المفاتيح. للرجوع لـ Sheets مؤقتاً: `DATABASE_PROVIDER=sheets`.
 
+## كلمات الرد (`yassmin.keywords`)
+
+- **اللوحة**: تبويب **«ردود البوت»** — يحتاج `SUPABASE_SERVICE_ROLE_KEY` على الخادم الذي يشغّل الـ API (محليًا أو Vercel).
+- **قراءة لـ n8n** (بدل شيت `keywords`):  
+  `GET https://المشروع.supabase.co/functions/v1/yassmin-dashboard-api/keywords`  
+  مع ترويسات `apikey` و `Authorization: Bearer <SUPABASE_ANON_KEY>`. الاستجابة: `{ "ok": true, "keywords": [ { "id", "keyword", "reply", "active", "sort_order", … } ] }`.
+- **كتابة من Edge** (اختياري): `POST/PATCH/DELETE …/keywords` مع ترويسة `x-admin-token` نفس `DASHBOARD_ADMIN_TOKEN` إن وُجدت على الدالة.
+
 ## ترحيل البيانات من Google Sheets
 
 ```bash
@@ -69,6 +77,20 @@ npm run migrate:sheets-to-supabase
 - **paused_chats / bot_outbound / keywords**: نفس أسماء التبويبات السابقة في Sheets
 
 **لو تبويب «الرسائل» في اللوحة فاضي:** تأكدي أن workflow البوت يستدعي `POST .../yassmin-dashboard-api/ingest/message` بعد كل رسالة. لو عندك `N8N_WEBHOOK_SECRET` على دالة Edge، لازم نفس القيمة تُرسل من n8n في ترويسة `x-n8n-secret` وإلا الـ ingest يرجع 401 ولا يُسجَّل شيء في `message_log`.
+
+## كرون إرسال واتساب (Supabase — كل 30 دقيقة)
+
+الاستقبال التلقائي بعد التأكيد يعتمد على **n8n** وليس على Vercel.
+
+1. **نشر Edge Function `yassmin-payments-api`** بعد آخر تعديل (يدعم `GET ?pending_whatsapp=1&limit=20`: صفوف `done=true` و`dead_letter=false` و`whatsapp_status` فارغ أو `failed`، حتى `limit` صف كحد أقصى).
+2. استورد **`payment-auto-send-cron-supabase-n8n-workflow.json`** في n8n و**فعّل** الـ workflow.
+3. عرّف متغيرات البيئة في n8n (أو استبدل التعبيرات في العقد):
+   - `YASSMIN_SUPABASE_FUNCTIONS_URL` — مثل `https://المشروع.supabase.co/functions/v1` (بدون شرطة أخيرة)
+   - `SUPABASE_ANON_KEY`
+   - `EVOLUTION_API_URL`، `EVOLUTION_INSTANCE`، `EVOLUTION_API_KEY`
+4. **عطّل** مسار **«Cron: Every 30 Minutes»** الذي يقرأ **Google Sheets** في `full-whatsapp-bot-yassmin-workflow.json` أو `whatsapp-payment-confirmation-workflow.json` حتى لا يحدث إرسال مزدوج لصفوف ما زالت على الشيت.
+
+زر **«إرسال الآن»** في الداشبورد يظل يعمل فورًا من Vercel بغض النظر عن الكرون.
 
 مثال فلتر (PostgREST):
 

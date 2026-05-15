@@ -84,6 +84,53 @@ function mapThread(row) {
   };
 }
 
+function buildThreadsFromMessageLog(logRows) {
+  if (!logRows || !logRows.length) return [];
+  const sorted = [...logRows].sort(
+    (a, b) => new Date(a.logged_at).getTime() - new Date(b.logged_at).getTime()
+  );
+  const byPhone = new Map();
+  for (const row of sorted) {
+    const phone = normPhone(row.phone);
+    if (!phone) continue;
+    if (!byPhone.has(phone)) {
+      byPhone.set(phone, {
+        phone,
+        last_message_at: row.logged_at,
+        last_inbound_text: '',
+        last_inbound_at: null,
+        last_reply_text: '',
+        last_reply_at: null,
+        last_keyword: '',
+        routing_mode: 'auto',
+        message_count: 0,
+        last_status: null,
+        human_handoff_until: null,
+        human_handoff_reason: null
+      });
+    }
+    const t = byPhone.get(phone);
+    t.message_count += 1;
+    t.last_message_at = row.logged_at;
+    const msg = String(row.message ?? '').trim();
+    const reply = String(row.reply_sent ?? '').trim();
+    if (msg) {
+      t.last_inbound_text = msg;
+      t.last_inbound_at = row.logged_at;
+    }
+    if (reply) {
+      t.last_reply_text = reply;
+      t.last_reply_at = row.logged_at;
+    }
+    if (row.keyword_matched) t.last_keyword = row.keyword_matched;
+    if (row.status) t.last_status = row.status;
+    if (row.routing_mode) t.routing_mode = row.routing_mode;
+  }
+  return Array.from(byPhone.values()).sort(
+    (a, b) => new Date(b.last_message_at).getTime() - new Date(a.last_message_at).getTime()
+  );
+}
+
 async function listThreads(filters = {}) {
   if (useMessagesEdge()) {
     const q = encodeURIComponent(filters.q || '');
@@ -99,6 +146,16 @@ async function listThreads(filters = {}) {
   if (error) throw error;
 
   let rows = (threads || []).map(mapThread);
+  if (!(threads || []).length) {
+    const { data: logForThreads, error: logErr } = await supabase
+      .from('message_log')
+      .select('*')
+      .order('logged_at', { ascending: false })
+      .limit(500);
+    if (logErr) throw logErr;
+    const synthetic = buildThreadsFromMessageLog(logForThreads || []);
+    if (synthetic.length) rows = synthetic.map(mapThread);
+  }
   const q = String(filters.q || '')
     .trim()
     .toLowerCase();

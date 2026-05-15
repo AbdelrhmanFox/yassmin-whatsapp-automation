@@ -21,6 +21,12 @@ const {
   ingestPausedChat,
   listThreadMessages
 } = require('./lib/messages-store');
+const {
+  listKeywords,
+  createKeyword,
+  updateKeyword,
+  deleteKeyword
+} = require('./lib/keywords-store');
 
 const PORT = Number(process.env.DASHBOARD_PORT || 8088);
 const ADMIN_TOKEN = process.env.DASHBOARD_ADMIN_TOKEN || 'change-me';
@@ -411,6 +417,50 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (url.pathname === '/api/keywords') {
+    if (!isAuthorized(req)) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      return;
+    }
+    try {
+      if (req.method === 'GET') {
+        sendJson(res, 200, await listKeywords());
+        return;
+      }
+      if (req.method === 'POST') {
+        const body = await readBody(req);
+        sendJson(res, 201, await createKeyword(body));
+        return;
+      }
+      if (req.method === 'PATCH') {
+        const id = url.searchParams.get('id') || '';
+        if (!id) {
+          sendJson(res, 400, { ok: false, error: 'missing_keyword_id' });
+          return;
+        }
+        const body = await readBody(req);
+        sendJson(res, 200, await updateKeyword(id, body));
+        return;
+      }
+      if (req.method === 'DELETE') {
+        const id = url.searchParams.get('id') || '';
+        if (!id) {
+          sendJson(res, 400, { ok: false, error: 'missing_keyword_id' });
+          return;
+        }
+        sendJson(res, 200, await deleteKeyword(id));
+        return;
+      }
+    } catch (error) {
+      const code =
+        error.code === 'CONFIG' ? 503 : error.code === 'VALIDATION' ? 422 : error.code === 'NOT_FOUND' ? 404 : 500;
+      sendJson(res, code, { ok: false, error: error.message });
+      return;
+    }
+    sendJson(res, 405, { ok: false, error: 'method_not_allowed' });
+    return;
+  }
+
   if (req.method === 'GET' && url.pathname === '/api/messages-thread') {
     if (!isAuthorized(req)) {
       sendJson(res, 401, { ok: false, error: 'unauthorized' });
@@ -486,6 +536,6 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(PORT, () => {
   console.log(`\n📊 لوحة التحكم: http://localhost:${PORT}`);
-  console.log(`   Google Sheets: ${sheetsConfigured() ? 'متصل ✓' : 'غير متصل — شغّلي sync:google-sheets'}`);
-  console.log(`   ملف الدفع: ${PAYMENT_SPREADSHEET_ID}\n`);
+  console.log(`   Supabase: ${supabaseConfigured() ? 'متصل ✓' : 'غير متصل — راجع المفاتيح'}`);
+  console.log('');
 });

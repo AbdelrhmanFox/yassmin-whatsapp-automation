@@ -29,6 +29,13 @@ const msgStatHuman = document.getElementById('msgStatHuman');
 const msgStatReceived = document.getElementById('msgStatReceived');
 const refreshPaymentsBtn = document.getElementById('refreshPayments');
 const refreshMessagesBtn = document.getElementById('refreshMessages');
+const keywordsBody = document.getElementById('keywordsBody');
+const refreshKeywordsBtn = document.getElementById('refreshKeywords');
+const kwNewOrder = document.getElementById('kwNewOrder');
+const kwNewActive = document.getElementById('kwNewActive');
+const kwNewTrigger = document.getElementById('kwNewTrigger');
+const kwNewReply = document.getElementById('kwNewReply');
+const kwAddBtn = document.getElementById('kwAddBtn');
 
 const STATUS_LABELS = {
   pending_review: 'بانتظار المراجعة',
@@ -300,7 +307,7 @@ async function refreshEnvBanner() {
         التعديلات فورية. استخدمي <strong>إرسال الآن</strong> للإرسال الفوري، أو انتظري الكرون كل <strong>30 دقيقة</strong>.
         <br><small>اللوحة: <a href="https://yassmin-whatsapp-automation.vercel.app" target="_blank" rel="noopener">yassmin-whatsapp-automation.vercel.app</a></small>`;
     } else if (connected && provider === 'sheets') {
-      envBanner.innerHTML = `<strong>متصل بـ Google Sheets</strong> — التعديلات تُكتب في عمود <code>done</code>.`;
+      envBanner.innerHTML = `<strong>وضع Google Sheets</strong> — يُفضّل الترحيل إلى Supabase؛ تبويب «ردود البوت» يعمل مع Supabase فقط.`;
     } else {
       envBanner.innerHTML = `<strong>غير متصل بقاعدة البيانات</strong> — راجع متغيرات Vercel: <code>SUPABASE_URL</code> و <code>SUPABASE_PAYMENTS_FUNCTION_URL</code>.`;
     }
@@ -480,6 +487,141 @@ async function onRoutingAction(btn) {
   }
 }
 
+async function loadKeywords() {
+  if (!keywordsBody) return;
+  keywordsBody.innerHTML = '<tr><td colspan="5" class="empty">جاري التحميل…</td></tr>';
+  try {
+    const res = await fetch('/api/keywords', { headers: apiHeaders() });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'فشل تحميل الردود');
+    }
+    renderKeywordsTable(data.keywords || []);
+  } catch (e) {
+    keywordsBody.innerHTML = `<tr><td colspan="5" class="empty error">${escapeHtml(e.message)}</td></tr>`;
+    showToast(e.message, 'err');
+  }
+}
+
+function renderKeywordsTable(rows) {
+  if (!keywordsBody) return;
+  if (!rows.length) {
+    keywordsBody.innerHTML =
+      '<tr><td colspan="5" class="empty">لا توجد قواعد بعد — أضيفي صف «default» كرد احتياطي.</td></tr>';
+    return;
+  }
+  keywordsBody.innerHTML = rows
+    .map((row) => {
+      const id = escapeHtml(row.id);
+      const ord = Number(row.sort_order) || 0;
+      const active = row.active !== false;
+      const kw = escapeHtml(row.keyword || '');
+      const rep = escapeHtml(row.reply || '');
+      return `<tr data-kw-id="${id}">
+        <td><input type="number" class="kw-order" data-field="sort_order" value="${ord}" aria-label="ترتيب" /></td>
+        <td><input type="checkbox" data-field="active" ${active ? 'checked' : ''} aria-label="مفعّل" /></td>
+        <td><textarea class="input-textarea" data-field="keyword" rows="2">${kw}</textarea></td>
+        <td><textarea class="input-textarea" data-field="reply" rows="4">${rep}</textarea></td>
+        <td>
+          <button type="button" class="btn-sm btn-kw-save" data-id="${id}">حفظ</button>
+          <button type="button" class="btn-sm btn-kw-del danger-text" data-id="${id}">حذف</button>
+        </td>
+      </tr>`;
+    })
+    .join('');
+
+  keywordsBody.querySelectorAll('.btn-kw-save').forEach((btn) => {
+    btn.addEventListener('click', () => onSaveKeywordRow(btn));
+  });
+  keywordsBody.querySelectorAll('.btn-kw-del').forEach((btn) => {
+    btn.addEventListener('click', () => onDeleteKeyword(btn.getAttribute('data-id')));
+  });
+}
+
+function readKeywordRow(tr) {
+  const sort_order = Number(tr.querySelector('[data-field="sort_order"]')?.value) || 0;
+  const active = Boolean(tr.querySelector('[data-field="active"]')?.checked);
+  const keyword = String(tr.querySelector('[data-field="keyword"]')?.value ?? '').trim();
+  const reply = String(tr.querySelector('[data-field="reply"]')?.value ?? '').trim();
+  return { sort_order, active, keyword, reply };
+}
+
+async function onSaveKeywordRow(btn) {
+  const id = btn.getAttribute('data-id');
+  const tr = btn.closest('tr');
+  if (!id || !tr) return;
+  const body = readKeywordRow(tr);
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/keywords?id=${encodeURIComponent(id)}`, {
+      method: 'PATCH',
+      headers: apiHeaders(),
+      body: JSON.stringify(body)
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'فشل الحفظ');
+    }
+    showToast('تم حفظ القاعدة');
+    await loadKeywords();
+  } catch (e) {
+    showToast(e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+async function onDeleteKeyword(id) {
+  if (!id || !confirm('حذف هذه القاعدة؟')) return;
+  try {
+    const res = await fetch(`/api/keywords?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      headers: apiHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'فشل الحذف');
+    }
+    showToast('تم الحذف');
+    await loadKeywords();
+  } catch (e) {
+    showToast(e.message, 'err');
+  }
+}
+
+async function onAddKeyword() {
+  if (!kwAddBtn) return;
+  const sort_order = Number(kwNewOrder?.value) || 0;
+  const active = kwNewActive?.checked !== false;
+  const keyword = String(kwNewTrigger?.value ?? '').trim();
+  const reply = String(kwNewReply?.value ?? '').trim();
+  if (!keyword || !reply) {
+    showToast('أدخل كلمات التشغيل والنص', 'err');
+    return;
+  }
+  kwAddBtn.disabled = true;
+  try {
+    const res = await fetch('/api/keywords', {
+      method: 'POST',
+      headers: apiHeaders(),
+      body: JSON.stringify({ keyword, reply, active, sort_order })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'فشل الإضافة');
+    }
+    showToast('تمت الإضافة');
+    kwNewTrigger.value = '';
+    kwNewReply.value = '';
+    kwNewOrder.value = '0';
+    await loadKeywords();
+  } catch (e) {
+    showToast(e.message, 'err');
+  } finally {
+    kwAddBtn.disabled = false;
+  }
+}
+
 function setView(view) {
   document.querySelectorAll('.nav-item').forEach((b) => b.classList.remove('active'));
   document.querySelector(`.nav-item[data-view="${view}"]`)?.classList.add('active');
@@ -489,6 +631,7 @@ function setView(view) {
   const titles = {
     payments: 'عمليات الدفع',
     messages: 'رسائل واتساب',
+    keywords: 'ردود البوت (كلمات مفتاحية)',
     operations: 'تحكم الأتمتة'
   };
   document.getElementById('viewTitle').textContent = titles[view] || 'Yassmin Ops';
@@ -497,9 +640,11 @@ function setView(view) {
   const paymentsOn = view === 'payments';
   refreshPaymentsBtn.classList.toggle('hidden', !paymentsOn);
   refreshMessagesBtn?.classList.toggle('hidden', view !== 'messages');
+  refreshKeywordsBtn?.classList.toggle('hidden', view !== 'keywords');
 
   if (view === 'payments') loadPayments();
   if (view === 'messages') loadMessages();
+  if (view === 'keywords') loadKeywords();
 }
 
 function startAutoRefresh() {
@@ -507,6 +652,7 @@ function startAutoRefresh() {
   autoRefreshTimer = setInterval(() => {
     if (!document.getElementById('view-payments').classList.contains('hidden')) loadPayments();
     if (!document.getElementById('view-messages').classList.contains('hidden')) loadMessages();
+    if (!document.getElementById('view-keywords')?.classList.contains('hidden')) loadKeywords();
   }, 60_000);
 }
 
@@ -516,6 +662,8 @@ document.querySelectorAll('.nav-item').forEach((btn) => {
 
 document.getElementById('refreshPayments').addEventListener('click', loadPayments);
 refreshMessagesBtn?.addEventListener('click', loadMessages);
+refreshKeywordsBtn?.addEventListener('click', loadKeywords);
+kwAddBtn?.addEventListener('click', onAddKeyword);
 closeThreadPanelBtn?.addEventListener('click', () => {
   threadPanel?.classList.add('hidden');
 });

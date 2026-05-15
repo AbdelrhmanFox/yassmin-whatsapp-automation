@@ -186,6 +186,36 @@ Deno.serve(async (req) => {
     }
 
     if (req.method === "GET" && (path === "/" || path === "")) {
+      const pendingWhatsapp = url.searchParams.get("pending_whatsapp") === "1";
+      if (pendingWhatsapp) {
+        const max = Math.min(Number(url.searchParams.get("limit") || "20") || 20, 50);
+        const { data, error } = await db
+          .from("payments")
+          .select("*")
+          .eq("done", true)
+          .eq("dead_letter", false)
+          .order("created_at", { ascending: true });
+        if (error) throw error;
+        const eligibleRaw = (data || []).filter((raw) => {
+          const r = raw as Record<string, unknown>;
+          if (!r.done || r.dead_letter) return false;
+          const wa = norm(r.whatsapp_status).toLowerCase();
+          if (wa === "sent" || wa === "dead_letter") return false;
+          return wa === "" || wa === "failed";
+        });
+        const capped = eligibleRaw.slice(0, max);
+        const rows = capped.map((r) => mapRow(r as Record<string, unknown>));
+        return json(200, {
+          ok: true,
+          provider: "supabase-edge",
+          schema: "yassmin",
+          pending_mode: true,
+          stats: summarize(rows),
+          count: rows.length,
+          rows
+        });
+      }
+
       const { data, error } = await db.from("payments").select("*").order("created_at", { ascending: false });
       if (error) throw error;
       let rows = (data || []).map((r) => mapRow(r as Record<string, unknown>));

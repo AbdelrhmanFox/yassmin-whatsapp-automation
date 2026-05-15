@@ -1,0 +1,291 @@
+{
+  "name": "Yassmin — كرون واتساب تأكيد الدفع (Supabase كل 30 د)",
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [{ "mode": "everyX", "value": 30, "unit": "minutes" }]
+        }
+      },
+      "id": "c2a1e000-1000-4000-8000-000000000001",
+      "name": "Cron: Every 30 Minutes (Supabase)",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [-1520, 500],
+      "notesInFlow": true,
+      "notes": "يقرأ الدفعات من Supabase فقط (?pending_whatsapp=1). عطّلي مسار «كل 30 د» في workflow جوجل شيت لو كان مفعّلاً لتفادي إرسال مزدوج."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api?pending_whatsapp=1&limit=20",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 25000 }
+      },
+      "id": "c2a1e000-1000-4000-8000-000000000002",
+      "name": "HTTP: Read Pending Payments (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1280, 380],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api/products",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 25000 }
+      },
+      "id": "c2a1e000-1000-4000-8000-000000000003",
+      "name": "HTTP: Read Products (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1280, 500],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-dashboard-api/paused-chats",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" }
+          ]
+        },
+        "options": { "timeout": 25000 }
+      },
+      "id": "c2a1e000-1000-4000-8000-000000000004",
+      "name": "HTTP: Read Paused Chats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-1280, 620],
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": { "mode": "append", "options": {} },
+      "id": "c2a1e000-1000-4000-8000-000000000005",
+      "name": "Merge: Cron DB Reads",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [-1040, 500]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const payResp = $('HTTP: Read Pending Payments (Supabase)').first().json || {};\nconst prodResp = $('HTTP: Read Products (Supabase)').first().json || {};\nconst pausedResp = $('HTTP: Read Paused Chats').first().json || {};\nconst rows = Array.isArray(payResp.rows) ? payResp.rows : [];\nconst FIXED_CONFIRMATION = 'تم تأكيد الدفع.';\nfunction normLbl(s) { return String(s || '').replace(/\\s+/g, ' ').trim(); }\nconst pdfEntries = [];\nfor (const p of prodResp.products || []) {\n  const c = String(p.product_code || '').trim().toLowerCase();\n  const u = String(p.pdf_url || '').trim();\n  const lbl = normLbl(p.label_ar).toLowerCase();\n  if (!u || /REPLACE/i.test(u)) continue;\n  pdfEntries.push({ code: c, url: u, label: lbl });\n}\nconst pdfByCode = {};\nfor (const e of pdfEntries) { if (e.code) pdfByCode[e.code] = e.url; }\nfunction resolvePdfUrl(codeRaw, labelRaw) {\n  const code = String(codeRaw || '').trim().toLowerCase();\n  const pl = normLbl(labelRaw).toLowerCase();\n  let url = code ? (pdfByCode[code] || '') : '';\n  if (!url && code) {\n    const hit = pdfEntries.find(e => e.label === code || e.code === code);\n    if (hit) url = hit.url;\n  }\n  if (!url && pl) {\n    const hit = pdfEntries.find(e => e.label && (pl === e.label || pl.includes(e.label) || e.label.includes(pl)));\n    if (hit) url = hit.url;\n  }\n  return url || '';\n}\nfunction normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\nfunction isPhonePaused(phone) {\n  const pr = Array.isArray(pausedResp.rows) ? pausedResp.rows : [];\n  const p = normalizePhone(phone);\n  const now = Date.now();\n  for (const row of pr) {\n    if (normalizePhone(row.phone) !== p) continue;\n    if (row.active === false) continue;\n    const exp = new Date(row.expires_at).getTime();\n    if (Number.isFinite(exp) && exp > now) return true;\n  }\n  return false;\n}\nconst out = [];\nconst processed_at = new Date().toISOString();\nfor (const r of rows) {\n  const targetTs = String(r.timestamp || r.id || '').trim();\n  const done = Boolean(r.done);\n  const status = String(r.whatsapp_status || '').trim().toLowerCase();\n  const phone = normalizePhone(r.phone);\n  let precheckError = '';\n  if (!done) precheckError = 'payment_not_confirmed';\n  else if (status === 'sent') precheckError = 'already_sent';\n  else if (status === 'dead_letter') precheckError = 'dead_letter';\n  else if (!phone) precheckError = 'missing_phone';\n  else if (!/^20\\d{10}$/.test(phone)) precheckError = 'invalid_phone';\n  else if (isPhonePaused(phone)) precheckError = 'human_handoff_paused';\n  const pdfUrl = resolvePdfUrl(r.product_code, r.product_label);\n  const confirmation_text = pdfUrl\n    ? FIXED_CONFIRMATION + '\\n\\nرابط تحميل الكتاب (PDF أو مجلد Drive):\\n' + pdfUrl\n    : FIXED_CONFIRMATION + '\\n\\nلم يُعثر على رابط تحميل لهذا الكتاب؛ سنتواصل معك لاحقًا.';\n  const should_send = precheckError === '';\n  out.push({\n    json: {\n      ok: true,\n      form_timestamp: targetTs,\n      phone,\n      confirmation_text,\n      pdf_url: pdfUrl,\n      product_code: r.product_code,\n      should_send,\n      precheck_error: precheckError,\n      processed_at,\n      stage: should_send ? 'ready_to_send' : 'precheck_failed'\n    }\n  });\n}\nreturn out;"
+      },
+      "id": "c2a1e000-1000-4000-8000-000000000006",
+      "name": "Code: Expand Pending To Items",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-800, 500]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "ready",
+              "leftValue": "={{ $json.should_send }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c2a1e000-1000-4000-8000-000000000007",
+      "name": "IF: Ready To Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [-560, 500]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ ($env.EVOLUTION_API_URL || 'https://evolution.growleadpro.com').replace(/\\/+$/, '') }}/message/sendText/{{ $env.EVOLUTION_INSTANCE || 'Yas' }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ number: $json.phone, text: $json.confirmation_text, delay: 1200, linkPreview: false }) }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "c2a1e000-1000-4000-8000-000000000008",
+      "name": "HTTP: Send Payment Confirmation (Evolution)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-320, 420],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nlet prep;\ntry {\n  prep = $('Code: Expand Pending To Items').item.json;\n} catch (e) {\n  prep = {};\n}\nconst messageId =\n  resp?.key?.id ||\n  resp?.message?.key?.id ||\n  resp?.data?.key?.id ||\n  resp?.messages?.[0]?.key?.id ||\n  '';\nconst base = {\n  form_timestamp: prep.form_timestamp,\n  phone: prep.phone,\n  confirmation_text: prep.confirmation_text,\n  processed_at: prep.processed_at\n};\nif (!messageId) {\n  const errMsg =\n    resp?.error?.message ||\n    resp?.message ||\n    (resp?.error ? String(resp.error) : '') ||\n    'no_outbound_message_id';\n  return [{ json: { ...base, send_ok: false, send_error: errMsg, evolution_response: resp } }];\n}\nreturn [{ json: { ...base, send_ok: true, message_id: messageId, send_error: '' } }];"
+      },
+      "id": "c2a1e000-1000-4000-8000-000000000009",
+      "name": "Code: Extract Payment Outbound Id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-80, 420]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": { "caseSensitive": true, "typeValidation": "strict", "version": 2 },
+          "conditions": [
+            {
+              "id": "ok-send",
+              "leftValue": "={{ $json.send_ok }}",
+              "rightValue": true,
+              "operator": { "type": "boolean", "operation": "equals" }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "c2a1e000-1000-4000-8000-00000000000a",
+      "name": "IF: Send Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [160, 420]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api/{{ encodeURIComponent($json.form_timestamp) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ whatsapp_status: 'sent', whatsapp_last_error: '', whatsapp_sent_at: $json.processed_at }) }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "c2a1e000-1000-4000-8000-00000000000b",
+      "name": "HTTP: Mark Sent (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 340]
+    },
+    {
+      "parameters": {
+        "method": "PATCH",
+        "url": "={{ ($env.YASSMIN_SUPABASE_FUNCTIONS_URL || 'https://YOUR_PROJECT_REF.supabase.co/functions/v1').replace(/\\/+$/, '') }}/yassmin-payments-api/{{ encodeURIComponent($json.form_timestamp) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ whatsapp_status: 'failed', whatsapp_last_error: String($json.send_error || $json.precheck_error || 'send_failed').slice(0, 500) }) }}",
+        "options": { "timeout": 20000 }
+      },
+      "id": "c2a1e000-1000-4000-8000-00000000000c",
+      "name": "HTTP: Mark Failed (Supabase)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, 520]
+    },
+    {
+      "parameters": {},
+      "id": "c2a1e000-1000-4000-8000-00000000000d",
+      "name": "No Op: Skip Precheck Fail",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [-320, 620]
+    },
+    {
+      "parameters": {},
+      "id": "c2a1e000-1000-4000-8000-00000000000e",
+      "name": "No Op: Cron Row Done",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [620, 420]
+    }
+  ],
+  "connections": {
+    "Cron: Every 30 Minutes (Supabase)": {
+      "main": [
+        [
+          { "node": "HTTP: Read Pending Payments (Supabase)", "type": "main", "index": 0 },
+          { "node": "HTTP: Read Products (Supabase)", "type": "main", "index": 0 },
+          { "node": "HTTP: Read Paused Chats", "type": "main", "index": 0 }
+        ]
+      ]
+    },
+    "HTTP: Read Pending Payments (Supabase)": {
+      "main": [[{ "node": "Merge: Cron DB Reads", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Read Products (Supabase)": {
+      "main": [[{ "node": "Merge: Cron DB Reads", "type": "main", "index": 1 }]]
+    },
+    "HTTP: Read Paused Chats": {
+      "main": [[{ "node": "Merge: Cron DB Reads", "type": "main", "index": 2 }]]
+    },
+    "Merge: Cron DB Reads": {
+      "main": [[{ "node": "Code: Expand Pending To Items", "type": "main", "index": 0 }]]
+    },
+    "Code: Expand Pending To Items": {
+      "main": [[{ "node": "IF: Ready To Send?", "type": "main", "index": 0 }]]
+    },
+    "IF: Ready To Send?": {
+      "main": [
+        [{ "node": "HTTP: Send Payment Confirmation (Evolution)", "type": "main", "index": 0 }],
+        [{ "node": "No Op: Skip Precheck Fail", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP: Send Payment Confirmation (Evolution)": {
+      "main": [[{ "node": "Code: Extract Payment Outbound Id", "type": "main", "index": 0 }]]
+    },
+    "Code: Extract Payment Outbound Id": {
+      "main": [[{ "node": "IF: Send Success?", "type": "main", "index": 0 }]]
+    },
+    "IF: Send Success?": {
+      "main": [
+        [{ "node": "HTTP: Mark Sent (Supabase)", "type": "main", "index": 0 }],
+        [{ "node": "HTTP: Mark Failed (Supabase)", "type": "main", "index": 0 }]
+      ]
+    },
+    "HTTP: Mark Sent (Supabase)": {
+      "main": [[{ "node": "No Op: Cron Row Done", "type": "main", "index": 0 }]]
+    },
+    "HTTP: Mark Failed (Supabase)": {
+      "main": [[{ "node": "No Op: Cron Row Done", "type": "main", "index": 0 }]]
+    }
+  },
+  "settings": { "executionOrder": "v1" },
+  "staticData": null,
+  "meta": { "templateCredsSetupCompleted": true }
+}

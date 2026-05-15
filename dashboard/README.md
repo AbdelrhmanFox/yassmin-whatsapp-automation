@@ -1,22 +1,17 @@
-# Dashboard — عمليات الدفع (SaaS)
+# Dashboard — Yassmin Ops
 
-لوحة لمتابعة شيت **عمليات الدفع** وتعديل عمود **تم تأكيد الدفع** (`done`) مباشرة — مربوطة بـ workflow n8n.
+لوحة لمتابعة **عمليات الدفع** على Supabase، **رسائل واتساب**، **ردود البوت** (`keywords`)، وتحكم اختياري في n8n.
 
 ## Features
 
-- **جدول عمليات الدفع** من Google Sheets (قراءة/كتابة مباشرة)
-- **تبديل تأكيد الدفع** — يكتب `TRUE` أو يفرّغ الخلية؛ عند الإلغاء يُصفّر `whatsapp_status` لإعادة الإرسال
-- **KPIs**: بانتظار المراجعة، مؤكد بانتظار واتساب، مُرسل، فشل
-- **بحث وفلترة** حسب الحالة
+- **عمليات الدفع**: تأكيد الدفع، إرسال واتساب فوري، KPIs — من `yassmin.payments`
+- **الرسائل**: محادثات وسجل — من `message_log` / Edge
+- **ردود البوت**: جدول `yassmin.keywords` (كلمات مفصولة بفواصل → نص الرد) — بديل تبويب الشيت
 - تبويب **تحكم الأتمتة**: pause / resume / retry (عبر webhook اختياري)
 
-## Start
+## Start (Supabase)
 
-1. ربط Google (مرة واحدة من جذر المشروع):
-
-```bash
-npm run sync:google-sheets
-```
+1. متغيرات البيئة: انسخي `.env.example` من جذر المشروع — `SUPABASE_URL`، `SUPABASE_SERVICE_ROLE_KEY`، واختياري `SUPABASE_DASHBOARD_FUNCTION_URL`.
 
 2. تشغيل اللوحة:
 
@@ -26,11 +21,9 @@ npm run dashboard:start
 
 3. افتحي: `http://localhost:8088`
 
-متغيرات البيئة: انسخي `dashboard/.env.example` — الأهم `PAYMENT_SPREADSHEET_ID` وملف `google-tokens.json` في جذر المشروع.
-
 ## Security Notes
 
-- Admin token is required for `/api/control`.
+- Admin token is required for `/api/control` and للـ API المحمية عند `DASHBOARD_DISABLE_AUTH=false`.
 - Use HTTPS + reverse proxy in production.
 - Rotate `DASHBOARD_ADMIN_TOKEN` periodically.
 - For localhost-only usage you can set `DASHBOARD_DISABLE_AUTH=true`.
