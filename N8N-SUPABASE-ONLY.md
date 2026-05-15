@@ -13,7 +13,19 @@
 - `SUPABASE_ANON_KEY` — مطلوب لجميع طلبات `yassmin-dashboard-api` و`yassmin-payments-api`.
 - `SUPABASE_URL` (مثل `https://<ref>.supabase.co`) — يُستخدم تلقائيًا في **كرون الدفعات** لبناء `.../functions/v1` إن لم تُضبط `YASSMIN_SUPABASE_FUNCTIONS_URL`.
 - `YASSMIN_SUPABASE_FUNCTIONS_URL` (اختياري) — إن وُجدت، تُستخدم كاملة لقاعدة المسارات (مثل `https://<ref>.supabase.co/functions/v1`) وتتقدّم على `SUPABASE_URL`.
+- `EVOLUTION_API_URL`، `EVOLUTION_INSTANCE`، **`EVOLUTION_API_KEY`** — مطلوبة لعقدة **HTTP: Send Reply** (إرسال الرد لـ WhatsApp). بدونها أو إن كان المفتاح/المثيل خطأ، لن يصل أي رد للعميل.
 - `N8N_WEBHOOK_SECRET` (اختياري لكن مُفضّل): عند التفعيل، أرسلي أيضًا الهيدر `x-n8n-secret` في عُقد HTTP نفسها إذا طلبتم قفلًا أشدّ على الـ Edge لاحقًا؛ حاليًا يُقبل anon + Bearer كما في عُقد `ingest`.
+
+## لا يصل رد على كلمة مفتاحية — ماذا أفحص؟
+
+افتحي **Execution** في n8n لآخر رسالة وابحثي عن أول عقدة لا تمرّ البيانات كما تتوقعين:
+
+1. **`IF: Valid Message?` فرع الرفض** — الويب هوك يتجاهل: رسالة من نفسك، بدون نص، **عمر الحدث أكثر من 300 ثانية** (`messageTimestamp`)، أو **مجموعة** `@g.us`. راجعي **`Code: Log Invalid Reason`** (`invalid_reason` مثل `too_old_…`).
+2. **`IF: Chat Paused?` = متوقفة** — المحادثة على **تحويل بشري**؛ لن يردّ البوت حتى تُستأنف من الداشبورد أو ينتهي الإيقاف.
+3. **`HTTP: Read Keywords`** — تأكدي أن **`SUPABASE_ANON_KEY`** على خادم n8n صحيح وأن الدالة `…/keywords` تعيد `200`.
+4. **`IF: Has Reply?` = لا** — في **`Code: Keyword Matcher`**: إن احتوى النص على **إيميل** أو **نمط رقم هاتف** ولم يُطابق أي كلمة، يُترك `reply` فارغًا عمدًا. جرّبي كلمة بسيطة من الداشبورد (جزء من الحقل `keyword` مفصول بفاصلة).
+5. **`IF: Clear to Send?` = لا** — Dedup: `user_cooldown` (40 ثانية)، نفس النص خلال دقيقتين، تكرار `message_id`، أو حدود المعدّل. راجعي **`block_reason`** في **`Code: Dedup & Volume Check`**.
+6. **`HTTP: Send Reply`** — تأكدت إن **`EVOLUTION_API_KEY`** والمثيل (`body.instance` من Webhook أو `EVOLUTION_INSTANCE`) صحيحان، والعنوان يطابق خادم Evolution لديكم.
 
 ## Edge — مسارات جديدة لـ n8n
 

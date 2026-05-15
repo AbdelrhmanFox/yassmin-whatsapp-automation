@@ -1,5 +1,4 @@
 {
-  "name": "WhatsApp Bot Yassmin — Supabase only",
   "nodes": [
     {
       "parameters": {
@@ -7,14 +6,14 @@
         "path": "whatsapp",
         "options": {}
       },
-      "id": "71e4ce50-82f1-412f-9315-dfebd12f6937",
+      "id": "d396c4ce-1d5e-4020-8e2a-bab97341dee8",
       "name": "Webhook: Receive WA Message",
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
       "notesInFlow": true,
       "position": [
-        -6320,
-        1616
+        -53920,
+        3184
       ],
       "webhookId": "wa-webhook-001",
       "notes": "Entry point from Evolution API webhook. Accepts incoming WhatsApp events."
@@ -71,14 +70,14 @@
         },
         "options": {}
       },
-      "id": "1ea4a011-5aaf-4117-849f-d57069728c20",
+      "id": "2679e38d-98b8-40fa-88b7-01c5ccb92570",
       "name": "IF: Valid Message?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "notesInFlow": true,
       "position": [
-        -6096,
-        1616
+        -53696,
+        2968
       ],
       "notes": "Guards: ignore own messages, empty text, old events, and group chats."
     },
@@ -86,26 +85,26 @@
       "parameters": {
         "jsCode": "// Diagnose why IF: Valid Message? rejected this message\nconst d = ($json.body?.data ?? $json.data) || {};\nconst m = d.message || {};\nconst text = m.conversation ?? m.extendedTextMessage?.text ?? m.imageMessage?.caption ?? m.videoMessage?.caption ?? '';\nconst ageSeconds = Math.floor((Date.now() / 1000) - (d.messageTimestamp || 0));\nconst reasons = [];\nif (d.key?.fromMe === true) reasons.push('from_me');\nif (!text) reasons.push('no_text (type: ' + Object.keys(m)[0] + ')');\nif (ageSeconds > 300) reasons.push('too_old_' + ageSeconds + 's');\nif ((d.key?.remoteJid || '').includes('@g.us')) reasons.push('group_chat');\nreturn [{ json: {\n  invalid_reason: reasons.join(' | ') || 'unknown',\n  phone: d.key?.remoteJid || '',\n  message_id: d.key?.id || '',\n  age_seconds: ageSeconds,\n  message_type: Object.keys(m)[0] || 'none',\n  had_text: Boolean(text)\n} }];"
       },
-      "id": "2d0b3e10-84ba-49b5-ae34-701e093b80fc",
+      "id": "85ee91fc-33bc-42ca-ab9d-0ab3dc672d94",
       "name": "Code: Log Invalid Reason",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "notesInFlow": true,
       "position": [
-        -5872,
-        2000
+        -53472,
+        3064
       ],
       "notes": "Captures why a message was rejected. Check execution logs to see invalid_reason, age_seconds, and message_type for debugging."
     },
     {
       "parameters": {},
-      "id": "34a1456e-4d1b-407e-a006-868623e5eb23",
+      "id": "aed88666-69be-403f-9154-fe64bcbd8160",
       "name": "No Op: Invalid Message",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -5648,
-        2000
+        -53248,
+        3064
       ]
     },
     {
@@ -140,20 +139,19 @@
         },
         "options": {}
       },
-      "id": "757101e2-9e21-42f2-851b-7c93872f8619",
+      "id": "dcde999d-3010-42a9-80d0-8e26dd3b1a6d",
       "name": "Set: Extract Fields",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "notesInFlow": true,
       "position": [
-        -5872,
-        1520
+        -53472,
+        2872
       ],
       "notes": "Normalizes payload fields used by the workflow (phone, text, message_id, timestamp)."
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/keywords",
         "sendHeaders": true,
         "headerParameters": {
@@ -176,13 +174,13 @@
           "timeout": 20000
         }
       },
-      "id": "487b1ec3-8a1d-4e15-a29f-587a8ca8a52d",
+      "id": "32c99a25-23d4-4c85-92d3-089c04e52395",
       "name": "HTTP: Read Keywords (DB)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -5648,
-        1808
+        -52352,
+        3040
       ],
       "alwaysOutputData": true,
       "settings": {
@@ -195,13 +193,13 @@
       "parameters": {
         "jsCode": "const data = $input.first().json || {};\nconst raw = Array.isArray(data.keywords) ? data.keywords : [];\nconst rows = raw.map((k) => ({\n  json: {\n    keyword: k.keyword != null ? String(k.keyword) : '',\n    reply: k.reply != null ? String(k.reply) : '',\n    active: k.active !== false && String(k.active ?? '').toUpperCase() !== 'FALSE'\n  }\n}));\nif (!rows.length) {\n  return [{\n    json: {\n      keyword: 'default',\n      reply: \"Sorry, I didn't understand that. Please try again.\",\n      active: true\n    }\n  }];\n}\nreturn rows;"
       },
-      "id": "c9e4f1a2-3b4c-5d6e-7f80-a1b2c3d4e5f6",
+      "id": "97a6b5e0-9e0a-45db-9c06-920c8324b30d",
       "name": "Code: Keywords DB to Rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5536,
-        1808
+        -52128,
+        3040
       ],
       "notes": "يحوّل استجابة { keywords: [...] } إلى صفوف كما كان يخرجها Google Sheets."
     },
@@ -209,13 +207,13 @@
       "parameters": {
         "jsCode": "const source = $('Set: Extract Fields').first().json;\nconst messageRaw = String(source.message_text || '').trim();\nconst message = messageRaw.toLowerCase();\nconst rows = $input.all().map(item => item.json);\n\nconst splitTriggers = (cell) =>\n  String(cell || '')\n    .toLowerCase()\n    .split(/[,\\u060C\\n]+/)\n    .map((k) => k.trim())\n    .filter(Boolean);\n\nlet matched = null;\n\nfor (const row of rows) {\n  if (row.active === false || row.active === 'FALSE') continue;\n  if (row.keyword && row.keyword.trim().toLowerCase() === 'default') continue;\n\n  const keywords = splitTriggers(row.keyword);\n\n  for (const kw of keywords) {\n    if (kw && message.includes(kw)) {\n      matched = row;\n      break;\n    }\n  }\n\n  if (matched) break;\n}\n\n// If no keyword matched but user sent contact data (email/phone),\n// skip default reply so flow can continue to the data/payment path silently.\nconst hasEmailInMsg = /[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}/.test(messageRaw);\nconst hasPhoneInMsg = /0[0-9]{9,12}|\\+?[0-9]{10,14}/.test(messageRaw);\n\nlet keywordMatched = '';\nlet reply = '';\n\nif (matched) {\n  keywordMatched = matched.keyword;\n  reply = matched.reply;\n} else if (!(hasEmailInMsg || hasPhoneInMsg)) {\n  const defaultRow = rows.find(r => r.keyword && String(r.keyword).trim().toLowerCase() === 'default');\n  keywordMatched = defaultRow?.keyword || 'default';\n  reply = defaultRow?.reply || \"Sorry, I didn't understand that. Please try again.\";\n}\n\nreturn [{\n  json: {\n    keyword_matched: keywordMatched,\n    reply,\n    phone: source.phone,\n    message_text: source.message_text,\n    message_id: source.message_id,\n    received_at: source.received_at\n  }\n}];"
       },
-      "id": "5eacc5a0-5a27-4d10-89e1-c216bc3cce56",
+      "id": "6b5bccfb-571e-4ed6-8e9f-bca6c6818b2b",
       "name": "Code: Keyword Matcher",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5424,
-        1808
+        -51904,
+        3040
       ]
     },
     {
@@ -243,38 +241,38 @@
         },
         "options": {}
       },
-      "id": "23d960a3-376a-4592-bcdf-dcd6f8f7ff66",
+      "id": "eae3b002-e3b2-42ee-bde9-db88a56deff3",
       "name": "IF: Has Reply?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -5200,
-        1808
+        -51680,
+        3040
       ]
     },
     {
       "parameters": {},
-      "id": "c0fe21c5-a5b5-4f10-8d81-ead37b53e82b",
+      "id": "d14964f0-aa7b-4c0c-8482-3e7e0074e0a8",
       "name": "No Op: No Reply",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -4976,
-        1904
+        -51456,
+        3160
       ]
     },
     {
       "parameters": {
         "jsCode": "// Protection layer: deduplication + per-user cooldown + burst control + global rate limit\nconst allRows = $input.all().map(r => r.json).filter(r => r.timestamp);\nconst msgData = $('Code: Keyword Matcher').first().json;\n\nconst now = Date.now();\nconst today = new Date().toISOString().split('T')[0];\nconst phone = String(msgData.phone || '');\nconst message = String(msgData.message_text || '').trim().toLowerCase();\n\nconst DAILY_LIMIT = 300;\nconst GLOBAL_PER_MINUTE_LIMIT = 45;\nconst USER_COOLDOWN_SECONDS = 40;\nconst DUPLICATE_WINDOW_SECONDS = 120;\nconst USER_BURST_PER_MINUTE_LIMIT = 2;\n\nconst toMs = (ts) => {\n  const n = new Date(ts).getTime();\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst alreadyProcessed = allRows.some(r => r.message_id && r.message_id === msgData.message_id);\n\nconst sameUserRows = allRows.filter(r => String(r.phone || '') === phone);\n\nconst duplicateRecentText = sameUserRows.some(r => {\n  const sameText = String(r.message || '').trim().toLowerCase() === message;\n  if (!sameText) return false;\n  const ageSec = (now - toMs(r.timestamp)) / 1000;\n  return ageSec >= 0 && ageSec <= DUPLICATE_WINDOW_SECONDS;\n});\n\nconst lastUserEventAt = Math.max(0, ...sameUserRows.map(r => toMs(r.timestamp)));\nconst userCooldownActive = lastUserEventAt > 0 && ((now - lastUserEventAt) / 1000) < USER_COOLDOWN_SECONDS;\n\nconst userLastMinuteCount = sameUserRows.filter(r => {\n  const ageSec = (now - toMs(r.timestamp)) / 1000;\n  return ageSec >= 0 && ageSec <= 60;\n}).length;\nconst userBurstLimitReached = userLastMinuteCount >= USER_BURST_PER_MINUTE_LIMIT;\n\nconst todayCount = allRows.filter(r => r.timestamp && String(r.timestamp).startsWith(today)).length;\nconst limitReached = todayCount >= DAILY_LIMIT;\n\nconst lastMinuteCount = allRows.filter(r => {\n  const ageSec = (now - toMs(r.timestamp)) / 1000;\n  return ageSec >= 0 && ageSec <= 60;\n}).length;\nconst globalMinuteLimitReached = lastMinuteCount >= GLOBAL_PER_MINUTE_LIMIT;\n\nlet blockReason = '';\nif (alreadyProcessed) blockReason = 'duplicate_message_id';\nelse if (duplicateRecentText) blockReason = 'duplicate_text_window';\nelse if (userCooldownActive) blockReason = 'user_cooldown';\nelse if (userBurstLimitReached) blockReason = 'user_burst_limit';\nelse if (globalMinuteLimitReached) blockReason = 'global_rate_limit';\nelse if (limitReached) blockReason = 'daily_limit';\n\nreturn [{\n  json: {\n    ...msgData,\n    already_processed: alreadyProcessed,\n    duplicate_recent_text: duplicateRecentText,\n    user_cooldown_active: userCooldownActive,\n    user_burst_limit_reached: userBurstLimitReached,\n    user_last_minute_count: userLastMinuteCount,\n    global_minute_limit_reached: globalMinuteLimitReached,\n    today_count: todayCount,\n    limit_reached: limitReached,\n    block_reason: blockReason,\n    clear_to_send: blockReason === ''\n  }\n}];"
       },
-      "id": "8684b2b7-864e-4eb5-adad-fa06b36fc8f3",
+      "id": "0942240e-e88d-49cb-9c8f-44e0ad7e1358",
       "name": "Code: Dedup & Volume Check",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "notesInFlow": true,
       "position": [
-        -4752,
-        1712
+        -51008,
+        2968
       ],
       "notes": "Anti-ban protection: dedup by message_id/text, per-user cooldown, global per-minute limit, and daily cap."
     },
@@ -302,50 +300,50 @@
         },
         "options": {}
       },
-      "id": "26093732-f99c-464a-81f1-75d639617a15",
+      "id": "abc7dff3-ca27-496c-824d-7bdfb009a1a4",
       "name": "IF: Clear to Send?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -4528,
-        1712
+        -50784,
+        2968
       ]
     },
     {
       "parameters": {},
-      "id": "8a9418b0-7953-4a49-b976-bd7104ee3a00",
+      "id": "26b24475-c9ab-41ee-907a-327d8c07578d",
       "name": "No Op: Blocked",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -4304,
-        1808
+        -50560,
+        3064
       ]
     },
     {
       "parameters": {
         "amount": "={{ Math.floor(Math.random() * 7) + 2 }}"
       },
-      "id": "5e561020-bbef-4971-adeb-89ce3a3301c8",
+      "id": "0b0f6081-f4a4-4ddd-a3c1-68652997521e",
       "name": "Wait: Anti-Ban Delay",
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
       "position": [
-        -4304,
-        1616
+        -50560,
+        2872
       ],
       "webhookId": "wait-webhook-001"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "=https://evolution.growleadpro.com/message/sendText/{{ $('Webhook: Receive WA Message').first().json.body.instance ?? 'test' }}",
+        "url": "={{ ($env.EVOLUTION_API_URL || 'https://evolution.growleadpro.com').replace(/\\/+$/, '') + '/message/sendText/' + (($('Webhook: Receive WA Message').first().json.body || {}).instance || $env.EVOLUTION_INSTANCE || 'Yas') }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
             {
               "name": "apikey",
-              "value": "9b68c406a356e217795877c96ff112b0f0a9efae58edeabc990f95b4d09f5787"
+              "value": "={{ $env.EVOLUTION_API_KEY }}"
             },
             {
               "name": "Content-Type",
@@ -361,14 +359,14 @@
           "timeout": 10000
         }
       },
-      "id": "a11810b4-85d7-4fef-acde-2a3ebd573637",
+      "id": "39c3aea4-1d0a-44cb-a9c5-ebcfff863336",
       "name": "HTTP: Send Reply",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "notesInFlow": true,
       "position": [
-        -4080,
-        1808
+        -50336,
+        2872
       ],
       "notes": "Sends reply text via Evolution API. Uses configured instance and API key."
     },
@@ -376,14 +374,14 @@
       "parameters": {
         "jsCode": "// ── Email extraction & intent classification ──\nconst msgData = $json || {};\nconst messageText = String(msgData.message_text || '').trim();\nconst phone = String(msgData.phone || '');\nconst receivedAt = msgData.received_at || new Date().toISOString();\nconst messageId = msgData.message_id || '';\n\n// Robust email regex (handles Arabic/English mixed messages)\nconst emailRegex = /[a-zA-Z0-9._%+\\-]+@[a-zA-Z0-9.\\-]+\\.[a-zA-Z]{2,}/g;\nconst emails = messageText.match(emailRegex) || [];\nconst emailRaw = emails[0] || '';\nconst email = emailRaw.toLowerCase().trim();\nconst hasEmail = email.length > 0;\n\n// Intent classification — Butterfly Digital Marketing message guide\nconst t = messageText.toLowerCase();\nlet intentType = 'other';\nif (t.includes('هدايا') || t.includes('مجانية') || t.includes('الهدايا')) {\n  intentType = 'free_gifts';\n} else if (t.includes('فولتارين') || t.includes('بوصلة') || t.includes('بوصله') ||\n           t.includes('17$') || t.includes('9$')) {\n  intentType = 'paid_products';\n} else if (t.includes('بلانر') || t.includes('planner') || t.includes('399')) {\n  intentType = 'planner_order';\n} else if (t.includes('باقة') || t.includes('باقه') || t.includes('انقاذ') ||\n           t.includes('شاملة') || t.includes('1400')) {\n  intentType = 'full_bundle';\n} else if (t.includes('جلسة') || t.includes('كوتشينج') || t.includes('50$')) {\n  intentType = 'private_consultation';\n} else if (t.includes('استشارة') || t.includes('استشاره') || t.includes('butterfly')) {\n  intentType = 'free_consultation';\n}\n\n// Name hint — formal prefix first, then first Arabic-only line as fallback\nlet nameHint = '';\nconst formalPats = [\n  /أنا\\s+([\\u0600-\\u06FF\\s]{2,20})/,\n  /اسمي\\s+([\\u0600-\\u06FF\\s]{2,20})/\n];\nfor (const p of formalPats) {\n  const fm = messageText.match(p);\n  if (fm) { nameHint = fm[1].trim(); break; }\n}\nif (!nameHint) {\n  const firstLine = messageText.split('\\n')[0].trim();\n  const requestStarters = ['عايزة','عايز','اريد','أريد','محتاجة','محتاج','اطلب','أطلب','مرحبا','اهلا','أهلا','ممكن','لو','عايز'];\n  const firstWord = firstLine.split(' ')[0];\n  const isRequest = requestStarters.some(w => firstWord.startsWith(w));\n  if (!isRequest && /^[\\u0600-\\u06FF]{2,15}(\\s[\\u0600-\\u06FF]{2,15}){0,2}$/.test(firstLine)) nameHint = firstLine;\n}\n\n// Phone number found inside message text (user may share different number)\nconst phoneInMsg = (messageText.match(/0[0-9]{9,12}|\\+?[0-9]{10,14}/) || [])[0] || '';\n\nreturn [{ json: { email, email_raw: emailRaw, has_email: hasEmail, intent_type: intentType, phone, phone_in_message: phoneInMsg, message_text: messageText, message_id: messageId, received_at: receivedAt, name_hint: nameHint, source: 'whatsapp' } }];"
       },
-      "id": "09ddeadd-a633-45e8-bdc0-35aadb78fb02",
+      "id": "722534ba-bba6-4a64-b601-40d237d57e26",
       "name": "Code: Email Extract & Classify",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "notesInFlow": true,
       "position": [
-        -5648,
-        1328
+        -52352,
+        2536
       ],
       "notes": "Extracts email from message text via regex, normalizes to lowercase, and classifies intent_type using Butterfly Digital Marketing keyword guide (free_gifts / paid_products / planner_order / full_bundle / free_consultation / private_consultation / other)."
     },
@@ -411,27 +409,27 @@
         },
         "options": {}
       },
-      "id": "6bdff13e-cca7-4c9e-8d1f-ff9edb71d7fa",
+      "id": "aa90e11a-f4a1-404e-8a4a-ad3d2546fab4",
       "name": "IF: Has Email?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "notesInFlow": true,
       "position": [
-        -5424,
-        1328
+        -52128,
+        2536
       ],
       "notes": "TRUE → message contains email → look up / upsert in email_leads sheet. FALSE → no email found → skip lead processing."
     },
     {
       "parameters": {},
-      "id": "5ac5a165-15bf-4a18-83e1-67a8ef8b194a",
+      "id": "57db82b9-3599-43a5-a37a-f737c021a899",
       "name": "No Op: No Email",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "notesInFlow": true,
       "position": [
-        -4976,
-        1520
+        -51680,
+        2776
       ],
       "notes": "Message contained no email address — lead not created. Reply path already completed."
     },
@@ -460,14 +458,14 @@
         },
         "options": {}
       },
-      "id": "27eac1cb-f224-4871-ac2b-2d3349233706",
+      "id": "02fa140c-1ea0-4813-969d-aa7e6ee2827f",
       "name": "IF: No Email Has Phone?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "notesInFlow": true,
       "position": [
-        -5200,
-        1424
+        -51904,
+        2656
       ],
       "notes": "Without email, only create no_email lead when user sends a phone number in the same message."
     },
@@ -513,14 +511,14 @@
         },
         "options": {}
       },
-      "id": "c5c0b3d7-61d2-4925-bb1e-9f6d0f32b324",
+      "id": "51324a62-76d5-4598-bd40-410740441778",
       "name": "IF: Outgoing Message?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "notesInFlow": true,
       "position": [
-        -6320,
-        2016
+        -53696,
+        3376
       ],
       "notes": "Human handoff: detects manual replies sent from WhatsApp (fromMe=true)."
     },
@@ -544,26 +542,26 @@
         },
         "options": {}
       },
-      "id": "f861f363-e064-4568-bcde-2e453de6d380",
+      "id": "1096101d-5646-4b2f-bdc0-e00a59797b18",
       "name": "Set: Extract Outgoing Fields",
       "type": "n8n-nodes-base.set",
       "typeVersion": 3.4,
       "position": [
-        -6096,
-        2016
+        -53472,
+        3304
       ]
     },
     {
       "parameters": {
         "jsCode": "function normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  while (d.startsWith('0020') && d.length > 12) d = d.slice(2);\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nconst src = $('Set: Extract Outgoing Fields').first().json;\nconst webhook = $('Webhook: Receive WA Message').first().json;\nconst d = (webhook.body?.data ?? webhook.data) || {};\nconst messageId = String(d.key?.id || src.message_id || '');\nconst phone = normalizePhone(src.phone);\nconst outboundRows = $input.all().map((i) => i.json).filter((r) => r.message_id);\n\nif (messageId && outboundRows.some((r) => String(r.message_id) === messageId)) {\n  return [{ json: { is_bot_message: true, skip_reason: 'bot_outbound_id', phone, message_id: messageId } }];\n}\n\nconst now = Date.now();\nconst recentBot = outboundRows.some((r) => {\n  if (normalizePhone(r.phone) !== phone) return false;\n  const t = new Date(r.sent_at).getTime();\n  return Number.isFinite(t) && now - t < 90000;\n});\nif (recentBot) {\n  return [{ json: { is_bot_message: true, skip_reason: 'recent_bot_send', phone, message_id: messageId } }];\n}\n\nreturn [{ json: { is_bot_message: false, phone, message_id: messageId } }];"
       },
-      "id": "ba4eecb2-350e-4fc1-b220-f50bb763c763",
+      "id": "a7788eee-bf53-4b7b-bbbc-36ee2f367b40",
       "name": "Code: Is Bot Own Message?",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5648,
-        2016
+        -52800,
+        3304
       ]
     },
     {
@@ -590,50 +588,50 @@
         },
         "options": {}
       },
-      "id": "53037ef6-1652-41ee-a855-e968ca07e483",
+      "id": "ff7cae74-9c01-4e98-b62a-4d42c06bd605",
       "name": "IF: Human Sent?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -5424,
-        2016
+        -52576,
+        3304
       ]
     },
     {
       "parameters": {
         "jsCode": "function normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  while (d.startsWith('0020') && d.length > 12) d = d.slice(2);\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nconst src = $('Set: Extract Outgoing Fields').first().json;\nconst phone = normalizePhone(src.phone);\nconst now = new Date();\nconst nowIso = now.toISOString();\nconst expiresIso = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();\n\nlet existingRows = [];\ntry {\n  const http = $('HTTP: Read Paused Chats Handoff (DB)').first().json;\n  if (Array.isArray(http.rows)) existingRows = http.rows;\n} catch {}\nif (!existingRows.length) {\n  try {\n    existingRows = $('Sheets: Read Paused Chats Handoff').all().map((i) => i.json);\n  } catch {}\n}\n\nconst existing = existingRows.find((r) => normalizePhone(r.phone) === phone);\n\nreturn [{\n  json: {\n    phone,\n    paused_at: existing?.paused_at || nowIso,\n    last_human_at: nowIso,\n    expires_at: expiresIso,\n    reason: 'human_handoff',\n    active: 'TRUE'\n  }\n}];"
       },
-      "id": "5d208ac7-ed54-4fbf-b19a-d63cf65e754d",
+      "id": "b6cbaa59-99ea-45ca-9e54-8cbae38d05c4",
       "name": "Code: Build Pause Row",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5200,
-        2016
+        -52128,
+        3232
       ]
     },
     {
       "parameters": {},
-      "id": "570acab8-e953-4ce1-b0af-eefa4ca45ab6",
+      "id": "b161c689-b8c8-4d01-9b25-0aa16d6bed44",
       "name": "No Op: Skip Bot Outgoing",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -5424,
-        2136
+        -52352,
+        3472
       ]
     },
     {
       "parameters": {
         "jsCode": "function normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  while (d.startsWith('0020') && d.length > 12) d = d.slice(2);\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nconst source = $('Set: Extract Fields').first().json;\nconst phone = normalizePhone(source.phone);\nconst pausedRows = $input.all().map((i) => i.json);\n\nlet chat_paused = false;\nfor (const r of pausedRows) {\n  if (normalizePhone(r.phone) !== phone) continue;\n  const active = String(r.active ?? '').trim().toUpperCase() === 'TRUE';\n  if (!active) continue;\n  const exp = new Date(r.expires_at).getTime();\n  if (Number.isFinite(exp) && exp > Date.now()) {\n    chat_paused = true;\n    break;\n  }\n}\n\nreturn [{ json: { ...source, chat_paused } }];"
       },
-      "id": "703c722c-3958-42c6-ac4f-96d0331bf80b",
+      "id": "c2104ca1-8fd4-4774-a7ff-1080a0e293e4",
       "name": "Code: Check Chat Paused",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5424,
-        1520
+        -52800,
+        2872
       ]
     },
     {
@@ -660,39 +658,39 @@
         },
         "options": {}
       },
-      "id": "b0f0237d-5b0c-4fc8-972c-22d9f1bb4539",
+      "id": "8a1948a2-939c-4acd-989e-ca927ceca458",
       "name": "IF: Chat Paused?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "notesInFlow": true,
       "position": [
-        -5200,
-        1520
+        -52576,
+        2872
       ],
       "notes": "Stops bot + leads when chat is in human handoff (24h from last manual reply)."
     },
     {
       "parameters": {},
-      "id": "b34ac0b4-b39f-4cbb-bf68-ff668b892848",
+      "id": "c1c772de-2c47-4947-ad86-271cc241cba6",
       "name": "No Op: Human Handoff",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -4976,
-        1616
+        -52352,
+        2848
       ]
     },
     {
       "parameters": {
         "jsCode": "const resp = $input.first().json;\nconst km = $('Code: Keyword Matcher').first().json;\nconst messageId =\n  resp?.key?.id ||\n  resp?.message?.key?.id ||\n  resp?.data?.key?.id ||\n  resp?.messages?.[0]?.key?.id ||\n  '';\nconst phone = String(km.phone || '').replace(/\\D/g, '');\nif (!messageId) {\n  return [{ json: { skip: true, reason: 'no_outbound_message_id' } }];\n}\nreturn [{\n  json: {\n    message_id: messageId,\n    phone,\n    source: 'keyword_reply',\n    sent_at: new Date().toISOString(),\n    skip: false\n  }\n}];"
       },
-      "id": "42ec198e-1de7-45fb-87ac-151e74472736",
+      "id": "80b4d282-775d-47f8-b097-965c18fa7996",
       "name": "Code: Extract Outbound Id",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4080,
-        2000
+        -50112,
+        2968
       ]
     },
     {
@@ -719,22 +717,19 @@
         },
         "options": {}
       },
-      "id": "3a6e192a-3338-4de3-a1e7-2bcf33a5ce30",
+      "id": "654b6c05-3252-45de-8aeb-ce37fddc7a6b",
       "name": "IF: Has Outbound Id?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
       "position": [
-        -3856,
-        2000
+        -49888,
+        2968
       ]
     },
     {
       "parameters": {
         "method": "POST",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/message",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  phone: $('Code: Keyword Matcher').first().json.phone,\n  message: $('Code: Keyword Matcher').first().json.message_text,\n  keyword_matched: $('Code: Keyword Matcher').first().json.keyword_matched,\n  reply_sent: $('Code: Keyword Matcher').first().json.reply,\n  status: $('Code: Keyword Matcher').first().json.reply ? 'auto_replied' : 'received',\n  message_id: $('Code: Keyword Matcher').first().json.message_id,\n  timestamp: $('Code: Keyword Matcher').first().json.received_at\n}) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -752,18 +747,21 @@
             }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  phone: $('Code: Keyword Matcher').first().json.phone,\n  message: $('Code: Keyword Matcher').first().json.message_text,\n  keyword_matched: $('Code: Keyword Matcher').first().json.keyword_matched,\n  reply_sent: $('Code: Keyword Matcher').first().json.reply,\n  status: $('Code: Keyword Matcher').first().json.reply ? 'auto_replied' : 'received',\n  message_id: $('Code: Keyword Matcher').first().json.message_id,\n  timestamp: $('Code: Keyword Matcher').first().json.received_at\n}) }}",
         "options": {
           "timeout": 20000
         }
       },
-      "id": "dff7221e-c79d-4327-9535-16f3c2a69cdf",
+      "id": "8defd9f5-c9f6-417e-b097-fc12c5117ec6",
       "name": "HTTP: DB Ingest Message",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "notesInFlow": true,
       "position": [
-        -3840,
-        1688
+        -50112,
+        2776
       ],
       "notes": "بعد إرسال الرد — يكتب في Supabase (متوازي مع الشيت)."
     },
@@ -771,9 +769,6 @@
       "parameters": {
         "method": "POST",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/message",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  phone: $('Code: Keyword Matcher').first().json.phone,\n  message: $('Code: Keyword Matcher').first().json.message_text,\n  keyword_matched: $('Code: Keyword Matcher').first().json.keyword_matched || null,\n  reply_sent: null,\n  status: 'received',\n  message_id: $('Code: Keyword Matcher').first().json.message_id,\n  timestamp: $('Code: Keyword Matcher').first().json.received_at\n}) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -791,18 +786,21 @@
             }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  phone: $('Code: Keyword Matcher').first().json.phone,\n  message: $('Code: Keyword Matcher').first().json.message_text,\n  keyword_matched: $('Code: Keyword Matcher').first().json.keyword_matched || null,\n  reply_sent: null,\n  status: 'received',\n  message_id: $('Code: Keyword Matcher').first().json.message_id,\n  timestamp: $('Code: Keyword Matcher').first().json.received_at\n}) }}",
         "options": {
           "timeout": 20000
         }
       },
-      "id": "a19b82a1-32d8-4828-9daa-d1fc7cfc9e53",
+      "id": "b1c8b1b8-3a0e-4985-9c7d-dd92e13d0686",
       "name": "HTTP: DB Ingest Message (No Reply)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "notesInFlow": true,
       "position": [
-        -3840,
-        2008
+        -51232,
+        3160
       ],
       "notes": "رسالة بدون رود تلقائي."
     },
@@ -810,9 +808,6 @@
       "parameters": {
         "method": "POST",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/message",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  phone: $('Set: Extract Fields').first().json.phone,\n  message: $('Set: Extract Fields').first().json.message_text,\n  status: 'human_handoff_skipped',\n  message_id: $('Set: Extract Fields').first().json.message_id,\n  timestamp: $('Set: Extract Fields').first().json.received_at || new Date().toISOString()\n}) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -830,18 +825,21 @@
             }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  phone: $('Set: Extract Fields').first().json.phone,\n  message: $('Set: Extract Fields').first().json.message_text,\n  status: 'human_handoff_skipped',\n  message_id: $('Set: Extract Fields').first().json.message_id,\n  timestamp: $('Set: Extract Fields').first().json.received_at || new Date().toISOString()\n}) }}",
         "options": {
           "timeout": 20000
         }
       },
-      "id": "53913a8f-3053-41d5-8ad1-f3dbc0f1714a",
+      "id": "2d13fd43-337a-4ee6-b825-1a8242463f2b",
       "name": "HTTP: DB Ingest Message (Paused)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "notesInFlow": true,
       "position": [
-        -5408,
-        1400
+        -52128,
+        2848
       ],
       "notes": "محادثة موقوفة — تسجيل واردة فقط."
     },
@@ -849,9 +847,6 @@
       "parameters": {
         "method": "POST",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/paused-chat",
-        "sendBody": true,
-        "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({\n  phone: $json.phone,\n  paused_at: $json.paused_at,\n  last_human_at: $json.last_human_at,\n  expires_at: $json.expires_at,\n  reason: $json.reason,\n  active: String($json.active).toUpperCase() === 'TRUE'\n}) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
@@ -869,24 +864,26 @@
             }
           ]
         },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  phone: $json.phone,\n  paused_at: $json.paused_at,\n  last_human_at: $json.last_human_at,\n  expires_at: $json.expires_at,\n  reason: $json.reason,\n  active: String($json.active).toUpperCase() === 'TRUE'\n}) }}",
         "options": {
           "timeout": 20000
         }
       },
-      "id": "bf2e0d8c-5f0e-4c12-a65f-6089f710ae19",
+      "id": "c7f8acb9-78d8-4804-9873-adb37e34240a",
       "name": "HTTP: DB Ingest Paused Chat",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "notesInFlow": true,
       "position": [
-        -4920,
-        2016
+        -51904,
+        3232
       ],
       "notes": "إيقاف الرد التلقائي 24 ساعة في Supabase."
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/paused-chats",
         "sendHeaders": true,
         "headerParameters": {
@@ -909,14 +906,14 @@
           "timeout": 20000
         }
       },
-      "id": "28cb85dc-085a-4e18-9a27-9378c798cca0",
+      "id": "1f7f08aa-0b9a-4020-a8c4-28099ce972e0",
       "name": "HTTP: Read Paused Chats (DB)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "notesInFlow": true,
       "position": [
-        -5528,
-        1520
+        -53248,
+        2872
       ],
       "alwaysOutputData": true,
       "settings": {
@@ -926,7 +923,6 @@
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/paused-chats",
         "sendHeaders": true,
         "headerParameters": {
@@ -949,14 +945,14 @@
           "timeout": 20000
         }
       },
-      "id": "2bbdb50e-721a-4363-94eb-8b5a2b52c3b8",
+      "id": "de48b07d-3c30-4228-bc78-a5699a885cda",
       "name": "HTTP: Read Paused Chats Handoff (DB)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "notesInFlow": true,
       "position": [
-        -5320,
-        2016
+        -52352,
+        3232
       ],
       "alwaysOutputData": true,
       "settings": {
@@ -968,18 +964,17 @@
       "parameters": {
         "jsCode": "const data = $input.first().json || {};\nconst rows = Array.isArray(data.rows) ? data.rows : [];\nif (!rows.length) {\n  return [{ json: { phone: '', active: 'FALSE', expires_at: '', _empty: true } }];\n}\nreturn rows.map((r) => ({\n  json: {\n    ...r,\n    active: r.active === true || String(r.active ?? '').trim().toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE'\n  }\n}));"
       },
-      "id": "6d133ebf-a94b-4b15-9eb5-ccf9bccd2672",
+      "id": "6c05b2ae-03c9-4949-995e-0f413c2553b8",
       "name": "Code: Flatten Paused Rows",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5408,
-        1520
+        -53024,
+        2872
       ]
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/message-log/recent?limit=800",
         "sendHeaders": true,
         "headerParameters": {
@@ -1002,13 +997,13 @@
           "timeout": 25000
         }
       },
-      "id": "a1000001-0000-4000-8000-000000000001",
+      "id": "a6675d0a-7732-4347-ab2c-e75889e33463",
       "name": "HTTP: Read Message Log (DB)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -4976,
-        1712
+        -51456,
+        2968
       ],
       "alwaysOutputData": true,
       "settings": {
@@ -1021,19 +1016,18 @@
       "parameters": {
         "jsCode": "const data = $input.first().json || {};\nconst rows = Array.isArray(data.rows) ? data.rows : [];\nreturn rows.map((r) => ({ json: r }));"
       },
-      "id": "a1000002-0000-4000-8000-000000000002",
+      "id": "777f4529-59fe-4aaa-b4e9-3f920ec6f921",
       "name": "Code: Flatten Message Log",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -4864,
-        1712
+        -51232,
+        2968
       ],
       "notes": "يحوّل { rows } إلى عناصر متعددة كما كان يفعل شيت message_log."
     },
     {
       "parameters": {
-        "method": "GET",
         "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/bot-outbound/recent?limit=3500",
         "sendHeaders": true,
         "headerParameters": {
@@ -1056,13 +1050,13 @@
           "timeout": 25000
         }
       },
-      "id": "a1000003-0000-4000-8000-000000000003",
+      "id": "86a1014f-55b0-407c-ba4b-588b04bc9a34",
       "name": "HTTP: Read Bot Outbound (DB)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
       "position": [
-        -5760,
-        2016
+        -53248,
+        3304
       ],
       "alwaysOutputData": true,
       "settings": {
@@ -1075,50 +1069,50 @@
       "parameters": {
         "jsCode": "const data = $input.first().json || {};\nconst rows = Array.isArray(data.rows) ? data.rows : [];\nreturn rows.map((r) => ({ json: r }));"
       },
-      "id": "a1000004-0000-4000-8000-000000000004",
+      "id": "ba315246-9169-47dd-b492-65354221c95c",
       "name": "Code: Flatten Bot Outbound",
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
       "position": [
-        -5648,
-        2016
+        -53024,
+        3304
       ]
     },
     {
       "parameters": {},
-      "id": "a1000005-0000-4000-8000-000000000005",
+      "id": "e3864d18-214e-4707-8cd9-f34c64025ad3",
       "name": "No Op: Email leads (deferred)",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -5200,
-        1200
+        -51904,
+        2464
       ],
       "notesInFlow": true,
       "notes": "فرع الإيميل: لاحقًا POST إلى Edge أو جدول email_leads — لا Google Sheets."
     },
     {
       "parameters": {},
-      "id": "a1000006-0000-4000-8000-000000000006",
+      "id": "23e41786-d148-40c8-9860-6e04a8f737af",
       "name": "No Op: Phone lead (deferred)",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -4752,
-        1380
+        -51680,
+        2584
       ],
       "notesInFlow": true,
       "notes": "فرع الهاتف بدون إيميل — أوقفنا شيت Append."
     },
     {
       "parameters": {},
-      "id": "a1000007-0000-4000-8000-000000000007",
+      "id": "cee27571-9852-4e48-a6a3-ad8ffceaac2d",
       "name": "No Op: Outbound logged in Supabase via ingest",
       "type": "n8n-nodes-base.noOp",
       "typeVersion": 1,
       "position": [
-        -4300,
-        1712
+        -49664,
+        2968
       ],
       "notes": "كانت Sheets Append Bot/Log — التسجيل عبر HTTP: DB Ingest Message."
     }
@@ -1225,6 +1219,17 @@
         [
           {
             "node": "No Op: No Reply",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Op: No Reply": {
+      "main": [
+        [
+          {
+            "node": "HTTP: DB Ingest Message (No Reply)",
             "type": "main",
             "index": 0
           }
@@ -1437,6 +1442,17 @@
         ]
       ]
     },
+    "No Op: Human Handoff": {
+      "main": [
+        [
+          {
+            "node": "HTTP: DB Ingest Message (Paused)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
     "Code: Extract Outbound Id": {
       "main": [
         [
@@ -1466,28 +1482,6 @@
         ]
       ]
     },
-    "No Op: No Reply": {
-      "main": [
-        [
-          {
-            "node": "HTTP: DB Ingest Message (No Reply)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "No Op: Human Handoff": {
-      "main": [
-        [
-          {
-            "node": "HTTP: DB Ingest Message (Paused)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
     "HTTP: Read Paused Chats (DB)": {
       "main": [
         [
@@ -1499,22 +1493,22 @@
         ]
       ]
     },
-    "Code: Flatten Paused Rows": {
+    "HTTP: Read Paused Chats Handoff (DB)": {
       "main": [
         [
           {
-            "node": "Code: Check Chat Paused",
+            "node": "Code: Build Pause Row",
             "type": "main",
             "index": 0
           }
         ]
       ]
     },
-    "HTTP: Read Paused Chats Handoff (DB)": {
+    "Code: Flatten Paused Rows": {
       "main": [
         [
           {
-            "node": "Code: Build Pause Row",
+            "node": "Code: Check Chat Paused",
             "type": "main",
             "index": 0
           }
@@ -1564,26 +1558,10 @@
           }
         ]
       ]
-    },
-    "No Op: Email leads (deferred)": {
-      "main": [
-        []
-      ]
-    },
-    "No Op: Phone lead (deferred)": {
-      "main": [
-        []
-      ]
-    },
-    "No Op: Outbound logged in Supabase via ingest": {
-      "main": [
-        []
-      ]
     }
   },
   "pinData": {},
   "meta": {
-    "templateCredsSetupCompleted": true,
     "instanceId": "060bc88294a96d5f2cd2b7733be4bcb1adb3c853f2f7840a2fd87c45001adad5"
   }
 }
