@@ -7,6 +7,9 @@ const SCHEMA = process.env.SUPABASE_SCHEMA || 'yassmin';
 let client;
 
 const PAYMENTS_FUNCTION_URL = process.env.SUPABASE_PAYMENTS_FUNCTION_URL || '';
+const DASHBOARD_FUNCTION_URL =
+  process.env.SUPABASE_DASHBOARD_FUNCTION_URL ||
+  PAYMENTS_FUNCTION_URL.replace(/yassmin-payments-api\/?$/, 'yassmin-dashboard-api');
 
 function supabaseConfigured() {
   return Boolean(
@@ -45,5 +48,6 @@ module.exports = {
   useSupabase,
   usePaymentsEdge,
   PAYMENTS_FUNCTION_URL,
+  DASHBOARD_FUNCTION_URL,
   SCHEMA
 };

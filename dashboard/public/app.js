@@ -15,6 +15,17 @@ const statAwaiting = document.getElementById('statAwaiting');
 const statSent = document.getElementById('statSent');
 const statFailed = document.getElementById('statFailed');
 
+const msgSearchQInput = document.getElementById('msgSearchQ');
+const msgFilterStatusInput = document.getElementById('msgFilterStatus');
+const messagesBody = document.getElementById('messagesBody');
+const recentMessagesBody = document.getElementById('recentMessagesBody');
+const msgStatTotal = document.getElementById('msgStatTotal');
+const msgStatAuto = document.getElementById('msgStatAuto');
+const msgStatHuman = document.getElementById('msgStatHuman');
+const msgStatReceived = document.getElementById('msgStatReceived');
+const refreshPaymentsBtn = document.getElementById('refreshPayments');
+const refreshMessagesBtn = document.getElementById('refreshMessages');
+
 const STATUS_LABELS = {
   pending_review: 'بانتظار المراجعة',
   awaiting_whatsapp: 'مؤكد — بانتظار واتساب',
@@ -30,7 +41,14 @@ const PROVIDER_LABELS = {
   sheets: 'Google Sheets'
 };
 
+const MSG_STATUS_LABELS = {
+  received: 'رسالة واردة',
+  auto_replied: 'رد تلقائي',
+  human_handoff: 'تحويل لرد بشري'
+};
+
 let searchDebounce;
+let msgSearchDebounce;
 let autoRefreshTimer;
 
 function apiHeaders() {
@@ -57,6 +75,27 @@ function statusBadge(status) {
   const label = STATUS_LABELS[status] || status || '—';
   const cls = STATUS_LABELS[status] ? status : 'pending_review';
   return `<span class="badge badge--${escapeHtml(cls)}">${escapeHtml(label)}</span>`;
+}
+
+function msgStatusBadge(status) {
+  const label = MSG_STATUS_LABELS[status] || status || '—';
+  const cls = MSG_STATUS_LABELS[status] ? status : 'received';
+  return `<span class="badge badge--${escapeHtml(cls)}">${escapeHtml(label)}</span>`;
+}
+
+function formatWhen(iso) {
+  if (!iso) return '—';
+  try {
+    return new Date(iso).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' });
+  } catch {
+    return String(iso);
+  }
+}
+
+function truncate(s, n = 80) {
+  const t = String(s ?? '').trim();
+  if (t.length <= n) return t || '—';
+  return t.slice(0, n) + '…';
 }
 
 function formatProduct(row) {
@@ -195,29 +234,158 @@ async function refreshEnvBanner() {
   }
 }
 
+function renderMsgStats(stats) {
+  if (!stats) return;
+  msgStatTotal.textContent = stats.total ?? '0';
+  msgStatAuto.textContent = stats.auto_replied ?? '0';
+  msgStatHuman.textContent = stats.human_handoff ?? '0';
+  msgStatReceived.textContent = stats.received ?? '0';
+}
+
+function renderMessagesTable(threads) {
+  if (!threads.length) {
+    messagesBody.innerHTML = '<tr><td colspan="5" class="empty">لا توجد محادثات بعد</td></tr>';
+    return;
+  }
+
+  messagesBody.innerHTML = threads
+    .map((row) => {
+      const human = row.routing_mode === 'human' || row.status === 'human_handoff';
+      const actionBtn = human
+        ? `<button type="button" class="btn-sm btn-ok" data-action="auto" data-phone="${escapeHtml(row.phone)}">تفعيل الرد التلقائي</button>`
+        : `<button type="button" class="btn-sm btn-warn" data-action="human" data-phone="${escapeHtml(row.phone)}">تحويل لرد بشري</button>`;
+      return `<tr data-phone="${escapeHtml(row.phone)}">
+        <td class="mono">${escapeHtml(row.phone)}</td>
+        <td title="${escapeHtml(row.last_inbound_text)}">${escapeHtml(truncate(row.last_inbound_text))}<br><small class="muted">${escapeHtml(formatWhen(row.last_inbound_at || row.last_message_at))}</small></td>
+        <td title="${escapeHtml(row.last_reply_text)}">${escapeHtml(truncate(row.last_reply_text || '—'))}</td>
+        <td>${msgStatusBadge(row.status)}</td>
+        <td>${actionBtn}</td>
+      </tr>`;
+    })
+    .join('');
+
+  messagesBody.querySelectorAll('button[data-action]').forEach((btn) => {
+    btn.addEventListener('click', () => onRoutingAction(btn));
+  });
+}
+
+function renderRecentMessages(rows) {
+  if (!rows.length) {
+    recentMessagesBody.innerHTML = '<tr><td colspan="5" class="empty">لا أحداث بعد</td></tr>';
+    return;
+  }
+
+  recentMessagesBody.innerHTML = rows
+    .map((row) => {
+      const status = row.status || (row.reply_sent ? 'auto_replied' : 'received');
+      return `<tr>
+        <td class="mono small">${escapeHtml(formatWhen(row.logged_at || row.timestamp))}</td>
+        <td class="mono">${escapeHtml(row.phone || '—')}</td>
+        <td title="${escapeHtml(row.message)}">${escapeHtml(truncate(row.message))}</td>
+        <td>${escapeHtml(row.keyword_matched || '—')}</td>
+        <td>${msgStatusBadge(status)}</td>
+      </tr>`;
+    })
+    .join('');
+}
+
+async function fetchMessages() {
+  const q = encodeURIComponent(msgSearchQInput.value.trim());
+  const status = encodeURIComponent(msgFilterStatusInput.value);
+  const res = await fetch(`/api/messages?q=${q}&status=${status}`, { headers: apiHeaders() });
+  const data = await res.json();
+  if (!res.ok || !data.ok) {
+    throw new Error(data.error || data.hint || 'فشل تحميل الرسائل');
+  }
+  return data;
+}
+
+async function loadMessages() {
+  messagesBody.innerHTML = '<tr><td colspan="5" class="empty">جاري التحميل…</td></tr>';
+  try {
+    const data = await fetchMessages();
+    const provider = data.provider || 'supabase';
+    providerPill.textContent = PROVIDER_LABELS[provider] || provider;
+    providerPill.className = `provider-pill provider-pill--${provider.includes('edge') ? 'edge' : 'db'}`;
+    renderMsgStats(data.stats);
+    renderMessagesTable(data.threads || []);
+    renderRecentMessages(data.recent_messages || []);
+  } catch (e) {
+    messagesBody.innerHTML = `<tr><td colspan="5" class="empty error">${escapeHtml(e.message)}</td></tr>`;
+    showToast(e.message, 'err');
+  }
+}
+
+async function onRoutingAction(btn) {
+  const phone = btn.getAttribute('data-phone');
+  const mode = btn.getAttribute('data-action') === 'human' ? 'human' : 'auto';
+  btn.disabled = true;
+  try {
+    const res = await fetch(`/api/chats/${encodeURIComponent(phone)}`, {
+      method: 'PATCH',
+      headers: apiHeaders(),
+      body: JSON.stringify({ mode, reason: 'dashboard_manual' })
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'فشل التحديث');
+    }
+    showToast(data.message || (mode === 'human' ? 'تم التحويل للرد البشري' : 'تم تفعيل الرد التلقائي'));
+    if (data.stats && data.threads) {
+      renderMsgStats(data.stats);
+      renderMessagesTable(data.threads);
+    } else {
+      await loadMessages();
+    }
+  } catch (e) {
+    showToast(e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function setView(view) {
+  document.querySelectorAll('.nav-item').forEach((b) => b.classList.remove('active'));
+  document.querySelector(`.nav-item[data-view="${view}"]`)?.classList.add('active');
+  document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
+  document.getElementById(`view-${view}`).classList.remove('hidden');
+
+  const titles = {
+    payments: 'عمليات الدفع',
+    messages: 'رسائل واتساب',
+    operations: 'تحكم الأتمتة'
+  };
+  document.getElementById('viewTitle').textContent = titles[view] || 'Yassmin Ops';
+  document.getElementById('viewSubtitle').style.display = view === 'payments' ? '' : 'none';
+
+  const paymentsOn = view === 'payments';
+  refreshPaymentsBtn.classList.toggle('hidden', !paymentsOn);
+  refreshMessagesBtn?.classList.toggle('hidden', view !== 'messages');
+
+  if (view === 'payments') loadPayments();
+  if (view === 'messages') loadMessages();
+}
+
 function startAutoRefresh() {
   clearInterval(autoRefreshTimer);
   autoRefreshTimer = setInterval(() => {
-    if (document.getElementById('view-payments').classList.contains('hidden')) return;
-    loadPayments();
+    if (!document.getElementById('view-payments').classList.contains('hidden')) loadPayments();
+    if (!document.getElementById('view-messages').classList.contains('hidden')) loadMessages();
   }, 60_000);
 }
 
 document.querySelectorAll('.nav-item').forEach((btn) => {
-  btn.addEventListener('click', () => {
-    document.querySelectorAll('.nav-item').forEach((b) => b.classList.remove('active'));
-    btn.classList.add('active');
-    const view = btn.getAttribute('data-view');
-    document.querySelectorAll('.view').forEach((v) => v.classList.add('hidden'));
-    document.getElementById(`view-${view}`).classList.remove('hidden');
-    document.getElementById('viewTitle').textContent =
-      view === 'payments' ? 'عمليات الدفع' : 'تحكم الأتمتة';
-    document.getElementById('viewSubtitle').style.display = view === 'payments' ? '' : 'none';
-    if (view === 'payments') loadPayments();
-  });
+  btn.addEventListener('click', () => setView(btn.getAttribute('data-view')));
 });
 
 document.getElementById('refreshPayments').addEventListener('click', loadPayments);
+refreshMessagesBtn?.addEventListener('click', loadMessages);
+
+msgSearchQInput?.addEventListener('input', () => {
+  clearTimeout(msgSearchDebounce);
+  msgSearchDebounce = setTimeout(loadMessages, 350);
+});
+msgFilterStatusInput?.addEventListener('change', loadMessages);
 
 searchQInput.addEventListener('input', () => {
   clearTimeout(searchDebounce);

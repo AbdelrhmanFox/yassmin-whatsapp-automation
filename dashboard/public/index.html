@@ -13,11 +13,12 @@
           <span class="brand-mark">Y</span>
           <div>
             <strong>Yassmin Ops</strong>
-            <small>لوحة عمليات الدفع</small>
+            <small>الدفع + رسائل واتساب</small>
           </div>
         </div>
         <nav class="nav">
           <button type="button" class="nav-item active" data-view="payments">عمليات الدفع</button>
+          <button type="button" class="nav-item" data-view="messages">الرسائل</button>
           <button type="button" class="nav-item" data-view="operations">تحكم الأتمتة</button>
         </nav>
         <div class="sidebar-foot">
@@ -94,6 +95,65 @@
                 </thead>
                 <tbody id="paymentsBody">
                   <tr><td colspan="9" class="empty">جاري التحميل…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-messages" class="view hidden">
+          <div class="kpi-row">
+            <article class="kpi-card"><span>المحادثات</span><strong id="msgStatTotal">—</strong></article>
+            <article class="kpi-card kpi-ok"><span>رد تلقائي</span><strong id="msgStatAuto">—</strong></article>
+            <article class="kpi-card kpi-info"><span>رد بشري</span><strong id="msgStatHuman">—</strong></article>
+            <article class="kpi-card kpi-warn"><span>رسالة جديدة</span><strong id="msgStatReceived">—</strong></article>
+          </div>
+
+          <div class="toolbar card">
+            <input id="msgSearchQ" type="search" placeholder="بحث برقم الواتساب أو نص الرسالة…" />
+            <select id="msgFilterStatus">
+              <option value="all">كل الحالات</option>
+              <option value="received">رسالة واردة</option>
+              <option value="auto_replied">رد تلقائي</option>
+              <option value="human_handoff">تحويل لرد بشري</option>
+            </select>
+            <button type="button" id="refreshMessages" class="btn-primary hidden">تحديث الرسائل</button>
+          </div>
+
+          <div class="card table-card">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>الواتساب</th>
+                    <th>آخر رسالة</th>
+                    <th>الرد التلقائي</th>
+                    <th>الحالة</th>
+                    <th>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody id="messagesBody">
+                  <tr><td colspan="5" class="empty">جاري التحميل…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <div class="card" style="margin-top: 16px">
+            <h3 style="margin-top: 0">آخر الأحداث (سجل)</h3>
+            <div class="table-wrap">
+              <table class="data-table data-table--compact">
+                <thead>
+                  <tr>
+                    <th>الوقت</th>
+                    <th>الرقم</th>
+                    <th>الرسالة</th>
+                    <th>كلمة مفتاحية</th>
+                    <th>الحالة</th>
+                  </tr>
+                </thead>
+                <tbody id="recentMessagesBody">
+                  <tr><td colspan="5" class="empty">—</td></tr>
                 </tbody>
               </table>
             </div>

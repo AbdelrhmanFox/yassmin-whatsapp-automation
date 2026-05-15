@@ -1248,7 +1248,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  while (d.startsWith('0020') && d.length > 12) d = d.slice(2);\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nconst src = $('Set: Extract Outgoing Fields').first().json;\nconst phone = normalizePhone(src.phone);\nconst now = new Date();\nconst nowIso = now.toISOString();\nconst expiresIso = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();\n\nconst existingRows = $('Sheets: Read Paused Chats Handoff').all().map((i) => i.json);\nconst existing = existingRows.find((r) => normalizePhone(r.phone) === phone);\n\nreturn [{\n  json: {\n    phone,\n    paused_at: existing?.paused_at || nowIso,\n    last_human_at: nowIso,\n    expires_at: expiresIso,\n    reason: 'human_handoff',\n    active: 'TRUE'\n  }\n}];"
+        "jsCode": "function normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  while (d.startsWith('0020') && d.length > 12) d = d.slice(2);\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nconst src = $('Set: Extract Outgoing Fields').first().json;\nconst phone = normalizePhone(src.phone);\nconst now = new Date();\nconst nowIso = now.toISOString();\nconst expiresIso = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();\n\nlet existingRows = [];\ntry {\n  const http = $('HTTP: Read Paused Chats Handoff (DB)').first().json;\n  if (Array.isArray(http.rows)) existingRows = http.rows;\n} catch {}\nif (!existingRows.length) {\n  try {\n    existingRows = $('Sheets: Read Paused Chats Handoff').all().map((i) => i.json);\n  } catch {}\n}\n\nconst existing = existingRows.find((r) => normalizePhone(r.phone) === phone);\n\nreturn [{\n  json: {\n    phone,\n    paused_at: existing?.paused_at || nowIso,\n    last_human_at: nowIso,\n    expires_at: expiresIso,\n    reason: 'human_handoff',\n    active: 'TRUE'\n  }\n}];"
       },
       "id": "5d208ac7-ed54-4fbf-b19a-d63cf65e754d",
       "name": "Code: Build Pause Row",
@@ -2132,6 +2132,255 @@
         -608,
         1136
       ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/message",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  phone: $('Code: Keyword Matcher').first().json.phone,\n  message: $('Code: Keyword Matcher').first().json.message_text,\n  keyword_matched: $('Code: Keyword Matcher').first().json.keyword_matched,\n  reply_sent: $('Code: Keyword Matcher').first().json.reply,\n  status: $('Code: Keyword Matcher').first().json.reply ? 'auto_replied' : 'received',\n  message_id: $('Code: Keyword Matcher').first().json.message_id,\n  timestamp: $('Code: Keyword Matcher').first().json.received_at\n}) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "dff7221e-c79d-4327-9535-16f3c2a69cdf",
+      "name": "HTTP: DB Ingest Message",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "notesInFlow": true,
+      "position": [
+        -3840,
+        1688
+      ],
+      "notes": "بعد إرسال الرد — يكتب في Supabase (متوازي مع الشيت)."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/message",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  phone: $('Code: Keyword Matcher').first().json.phone,\n  message: $('Code: Keyword Matcher').first().json.message_text,\n  keyword_matched: $('Code: Keyword Matcher').first().json.keyword_matched || null,\n  reply_sent: null,\n  status: 'received',\n  message_id: $('Code: Keyword Matcher').first().json.message_id,\n  timestamp: $('Code: Keyword Matcher').first().json.received_at\n}) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "a19b82a1-32d8-4828-9daa-d1fc7cfc9e53",
+      "name": "HTTP: DB Ingest Message (No Reply)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "notesInFlow": true,
+      "position": [
+        -3840,
+        2008
+      ],
+      "notes": "رسالة بدون رود تلقائي."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/message",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  phone: $('Set: Extract Fields').first().json.phone,\n  message: $('Set: Extract Fields').first().json.message_text,\n  status: 'human_handoff_skipped',\n  message_id: $('Set: Extract Fields').first().json.message_id,\n  timestamp: $('Set: Extract Fields').first().json.received_at || new Date().toISOString()\n}) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "53913a8f-3053-41d5-8ad1-f3dbc0f1714a",
+      "name": "HTTP: DB Ingest Message (Paused)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "notesInFlow": true,
+      "position": [
+        -5408,
+        1400
+      ],
+      "notes": "محادثة موقوفة — تسجيل واردة فقط."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/paused-chat",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({\n  phone: $json.phone,\n  paused_at: $json.paused_at,\n  last_human_at: $json.last_human_at,\n  expires_at: $json.expires_at,\n  reason: $json.reason,\n  active: String($json.active).toUpperCase() === 'TRUE'\n}) }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "bf2e0d8c-5f0e-4c12-a65f-6089f710ae19",
+      "name": "HTTP: DB Ingest Paused Chat",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "notesInFlow": true,
+      "position": [
+        -4920,
+        2016
+      ],
+      "notes": "إيقاف الرد التلقائي 24 ساعة في Supabase."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/paused-chats",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "28cb85dc-085a-4e18-9a27-9378c798cca0",
+      "name": "HTTP: Read Paused Chats (DB)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "notesInFlow": true,
+      "position": [
+        -5528,
+        1520
+      ],
+      "alwaysOutputData": true,
+      "settings": {
+        "alwaysOutputData": true
+      },
+      "notes": "يقرأ paused_chats من Supabase."
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/paused-chats",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "2bbdb50e-721a-4363-94eb-8b5a2b52c3b8",
+      "name": "HTTP: Read Paused Chats Handoff (DB)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "notesInFlow": true,
+      "position": [
+        -5320,
+        2016
+      ],
+      "alwaysOutputData": true,
+      "settings": {
+        "alwaysOutputData": true
+      },
+      "notes": "يقرأ paused_chats من Supabase."
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json || {};\nconst rows = Array.isArray(data.rows) ? data.rows : [];\nif (!rows.length) {\n  return [{ json: { phone: '', active: 'FALSE', expires_at: '', _empty: true } }];\n}\nreturn rows.map((r) => ({\n  json: {\n    ...r,\n    active: r.active === true || String(r.active ?? '').trim().toUpperCase() === 'TRUE' ? 'TRUE' : 'FALSE'\n  }\n}));"
+      },
+      "id": "6d133ebf-a94b-4b15-9eb5-ccf9bccd2672",
+      "name": "Code: Flatten Paused Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -5408,
+        1520
+      ]
     }
   ],
   "connections": {
@@ -2184,7 +2433,7 @@
       "main": [
         [
           {
-            "node": "Sheets: Read Paused Chats Gate",
+            "node": "HTTP: Read Paused Chats (DB)",
             "type": "main",
             "index": 0
           }
@@ -2298,6 +2547,11 @@
         [
           {
             "node": "Code: Extract Outbound Id",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "HTTP: DB Ingest Message",
             "type": "main",
             "index": 0
           }
@@ -2446,7 +2700,7 @@
       "main": [
         [
           {
-            "node": "Sheets: Read Paused Chats Handoff",
+            "node": "HTTP: Read Paused Chats Handoff (DB)",
             "type": "main",
             "index": 0
           }
@@ -2478,15 +2732,9 @@
             "node": "Sheets: Upsert Paused Chat",
             "type": "main",
             "index": 0
-          }
-        ]
-      ]
-    },
-    "Sheets: Read Paused Chats Gate": {
-      "main": [
-        [
+          },
           {
-            "node": "Code: Check Chat Paused",
+            "node": "HTTP: DB Ingest Paused Chat",
             "type": "main",
             "index": 0
           }
@@ -2735,6 +2983,61 @@
         [
           {
             "node": "Sheets: Mark Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Op: No Reply": {
+      "main": [
+        [
+          {
+            "node": "HTTP: DB Ingest Message (No Reply)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Op: Human Handoff": {
+      "main": [
+        [
+          {
+            "node": "HTTP: DB Ingest Message (Paused)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Read Paused Chats (DB)": {
+      "main": [
+        [
+          {
+            "node": "Code: Flatten Paused Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Flatten Paused Rows": {
+      "main": [
+        [
+          {
+            "node": "Code: Check Chat Paused",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Read Paused Chats Handoff (DB)": {
+      "main": [
+        [
+          {
+            "node": "Code: Build Pause Row",
             "type": "main",
             "index": 0
           }

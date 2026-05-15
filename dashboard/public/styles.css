@@ -257,6 +257,24 @@ pre {
 .badge--sent { background: #064e3b; color: #6ee7b7; }
 .badge--failed { background: #7f1d1d; color: #fca5a5; }
 .badge--dead_letter { background: #3b0764; color: #e9d5ff; }
+.badge--received { background: #1e3a5f; color: #93c5fd; }
+.badge--auto_replied { background: #064e3b; color: #6ee7b7; }
+.badge--human_handoff { background: #422006; color: #fcd34d; }
+
+.btn-sm {
+  font-size: 0.8rem;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  cursor: pointer;
+  background: var(--surface-2);
+  color: var(--text);
+}
+.btn-sm.btn-warn { border-color: #b45309; color: #fcd34d; }
+.btn-sm.btn-ok { border-color: #047857; color: #6ee7b7; }
+.btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
+.muted { color: var(--muted); font-size: 0.75rem; }
+.hidden { display: none !important; }
 .switch {
   position: relative;
   display: inline-block;

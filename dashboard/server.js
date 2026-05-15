@@ -11,6 +11,13 @@ const {
   getProvider,
   PAYMENT_SPREADSHEET_ID
 } = require('./lib/payments-store');
+const {
+  listThreads,
+  setRoutingMode,
+  ingestMessage,
+  ingestPausedChat
+} = require('./lib/messages-store');
+const { listThreads, setRoutingMode, ingestMessage, ingestPausedChat } = require('./lib/messages-store');
 
 const PORT = Number(process.env.DASHBOARD_PORT || 8088);
 const ADMIN_TOKEN = process.env.DASHBOARD_ADMIN_TOKEN || 'change-me';
@@ -277,6 +284,68 @@ const server = http.createServer(async (req, res) => {
   const patchMatch = url.pathname.match(/^\/api\/payments\/([^/]+)$/);
   if (req.method === 'PATCH' && patchMatch) {
     await handlePaymentPatch(req, res, patchMatch[1]);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/messages') {
+    if (!isAuthorized(req)) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      return;
+    }
+    try {
+      const q = url.searchParams.get('q') || '';
+      const status = url.searchParams.get('status') || 'all';
+      const data = await listThreads({ q, status });
+      sendJson(res, 200, data);
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: error.message });
+    }
+    return;
+  }
+
+  const chatPatchMatch = url.pathname.match(/^\/api\/chats\/([^/]+)$/);
+  if (req.method === 'PATCH' && chatPatchMatch) {
+    if (!isAuthorized(req)) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      return;
+    }
+    try {
+      const body = await readBody(req);
+      const mode = body.mode === 'human' ? 'human' : 'auto';
+      const data = await setRoutingMode(decodeURIComponent(chatPatchMatch[1]), mode, {
+        reason: body.reason || 'dashboard_manual'
+      });
+      sendJson(res, 200, {
+        ok: true,
+        message: mode === 'human' ? 'تم التحويل للرد البشري' : 'تم تفعيل الرد التلقائي',
+        stats: data.stats,
+        threads: data.threads
+      });
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: error.message });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/webhooks/n8n/message') {
+    try {
+      const body = await readBody(req);
+      const data = await ingestMessage(body);
+      sendJson(res, 200, data);
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: error.message });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/webhooks/n8n/paused-chat') {
+    try {
+      const body = await readBody(req);
+      const data = await ingestPausedChat(body);
+      sendJson(res, 200, data);
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: error.message });
+    }
     return;
   }
 

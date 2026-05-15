@@ -2,7 +2,8 @@
   "scripts": {
     "dashboard:start": "node dashboard/server.js",
     "vercel:build": "node scripts/vercel-prebuild.mjs",
-    "build:full-workflow": "node scripts/patch-human-handoff-bot.mjs && node scripts/patch-human-handoff-payment.mjs && node scripts/build-full-whatsapp-workflow.mjs",
+    "build:full-workflow": "node scripts/patch-human-handoff-bot.mjs && node scripts/patch-human-handoff-payment.mjs && node scripts/patch-n8n-dashboard-webhooks.mjs && node scripts/build-full-whatsapp-workflow.mjs",
+    "patch:dashboard-webhooks": "node scripts/patch-n8n-dashboard-webhooks.mjs",
     "create:excel-templates": "node scripts/create-excel-templates.mjs",
     "patch:excel": "node scripts/create-excel-templates.mjs && node scripts/patch-excel-workbooks.mjs",
     "sync:google-sheets": "node scripts/sync-live-google-sheets.js",
