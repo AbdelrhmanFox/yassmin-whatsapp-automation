@@ -6,21 +6,42 @@ const SCHEMA = process.env.SUPABASE_SCHEMA || 'yassmin';
 
 let client;
 
+function stripTrailingSlash(s) {
+  return String(s || '').replace(/\/+$/, '');
+}
+
 const PAYMENTS_FUNCTION_URL = process.env.SUPABASE_PAYMENTS_FUNCTION_URL || '';
-const DASHBOARD_FUNCTION_URL =
-  process.env.SUPABASE_DASHBOARD_FUNCTION_URL ||
-  PAYMENTS_FUNCTION_URL.replace(/yassmin-payments-api\/?$/, 'yassmin-dashboard-api');
+
+function resolveDashboardFunctionUrl() {
+  const explicit = stripTrailingSlash(process.env.SUPABASE_DASHBOARD_FUNCTION_URL || '');
+  if (explicit) return explicit;
+  const pay = stripTrailingSlash(PAYMENTS_FUNCTION_URL);
+  if (pay && /yassmin-payments-api/i.test(pay)) {
+    return stripTrailingSlash(
+      pay.replace(/yassmin-payments-api(\/?)$/i, 'yassmin-dashboard-api$1')
+    );
+  }
+  if (pay && /\/functions\/v1$/i.test(pay)) {
+    return `${pay}/yassmin-dashboard-api`;
+  }
+  const base = stripTrailingSlash(process.env.SUPABASE_URL || '');
+  if (base) return `${base}/functions/v1/yassmin-dashboard-api`;
+  return pay;
+}
+
+const DASHBOARD_FUNCTION_URL = resolveDashboardFunctionUrl();
 
 /** عند true: استخدمي PostgREST من Vercel بـ SUPABASE_SERVICE_ROLE_KEY حتى لو Edge معرّف (حالات نادرة). */
 const PAYMENTS_USE_DIRECT_DB =
   String(process.env.SUPABASE_PAYMENTS_USE_DIRECT_DB || '').toLowerCase() === 'true';
 
 function supabaseConfigured() {
+  const anon = process.env.SUPABASE_ANON_KEY;
   return Boolean(
     SUPABASE_URL &&
       (SUPABASE_SERVICE_ROLE_KEY ||
-        (PAYMENTS_FUNCTION_URL && process.env.SUPABASE_ANON_KEY) ||
-        (process.env.SUPABASE_DASHBOARD_FUNCTION_URL && process.env.SUPABASE_ANON_KEY))
+        (anon && PAYMENTS_FUNCTION_URL) ||
+        (anon && DASHBOARD_FUNCTION_URL))
   );
 }
 

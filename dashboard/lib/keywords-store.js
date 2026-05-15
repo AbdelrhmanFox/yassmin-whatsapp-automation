@@ -40,7 +40,8 @@ async function edgeFetch(path, options = {}) {
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) {
-    const err = new Error(data.error || `edge_${res.status}`);
+    const hint = data.path ? ` (${data.path})` : '';
+    const err = new Error((data.error || `edge_${res.status}`) + hint);
     if (res.status === 404) err.code = 'NOT_FOUND';
     if (res.status === 401) err.code = 'UNAUTHORIZED';
     if (res.status === 400 || res.status === 422) err.code = 'VALIDATION';
