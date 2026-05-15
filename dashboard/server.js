@@ -4,7 +4,13 @@ const path = require('path');
 const { URL } = require('url');
 
 const { sheetsConfigured } = require('./lib/google-sheets');
-const { listPayments, updatePaymentDone, PAYMENT_SPREADSHEET_ID } = require('./lib/payments-store');
+const { supabaseConfigured } = require('./lib/supabase');
+const {
+  listPayments,
+  updatePaymentDone,
+  getProvider,
+  PAYMENT_SPREADSHEET_ID
+} = require('./lib/payments-store');
 
 const PORT = Number(process.env.DASHBOARD_PORT || 8088);
 const ADMIN_TOKEN = process.env.DASHBOARD_ADMIN_TOKEN || 'change-me';
@@ -107,6 +113,8 @@ function handleHealth(res) {
   sendJson(res, 200, {
     ok: true,
     status: 'running',
+    databaseProvider: getProvider(),
+    supabaseConnected: supabaseConfigured(),
     sheetsConnected: sheetsConfigured(),
     paymentSpreadsheetId: PAYMENT_SPREADSHEET_ID,
     controlWebhookConfigured: Boolean(CONTROL_WEBHOOK_URL),

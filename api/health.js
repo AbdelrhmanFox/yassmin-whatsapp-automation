@@ -1,7 +1,9 @@
 const { sheetsConfigured } = require('../dashboard/lib/google-sheets');
+const { supabaseConfigured } = require('../dashboard/lib/supabase');
 const {
   PAYMENT_SPREADSHEET_ID,
-  PAYMENT_SHEET
+  PAYMENT_SHEET,
+  getProvider
 } = require('../dashboard/lib/payments-store');
 const { sendJson, DISABLE_AUTH } = require('./_helpers');
 
@@ -14,7 +16,10 @@ module.exports = async (req, res) => {
     ok: true,
     status: 'running',
     platform: process.env.VERCEL ? 'vercel' : 'node',
+    databaseProvider: getProvider(),
+    supabaseConnected: supabaseConfigured(),
     sheetsConnected: sheetsConfigured(),
+    supabaseSchema: process.env.SUPABASE_SCHEMA || 'yassmin',
     botSpreadsheetId: process.env.BOT_SPREADSHEET_ID || '1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY',
     paymentSpreadsheetId: PAYMENT_SPREADSHEET_ID,
     paymentSheetName: PAYMENT_SHEET,

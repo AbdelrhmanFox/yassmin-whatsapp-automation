@@ -21,7 +21,8 @@ module.exports = async (req, res) => {
     sendJson(res, 500, {
       ok: false,
       error: error.message,
-      hint: 'Share both spreadsheets with the service account email and set GOOGLE_SERVICE_ACCOUNT_JSON on Vercel.'
+      hint:
+        'Set SUPABASE_URL + SUPABASE_SERVICE_ROLE_KEY (preferred) or GOOGLE_SERVICE_ACCOUNT_JSON for Sheets fallback.'
     });
   }
 };
