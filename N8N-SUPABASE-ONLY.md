@@ -8,6 +8,37 @@
 | [`payment-auto-send-cron-supabase-n8n-workflow.json`](payment-auto-send-cron-supabase-n8n-workflow.json) | كرون كل 30 دقيقة: دفعات معلّقة من `yassmin-payments-api` + منتجات + paused chats — Supabase فقط. |
 | [`payment-send-now-n8n-workflow.json`](payment-send-now-n8n-workflow.json) | إرسال تأكيد دفعة واحدة عبر Webhook. |
 
+## فهم المسار: من الواتساب إلى الداشبورد (ببساطة)
+
+### مين يكلّم مين؟
+
+1. **العميل يبعت من واتساب** → الرسالة توصل **لسيرفر Evolution** (هو اللي متصل بحساب واتساب فعليًا). **الرسالة هنا وصلت لـ Evolution بالفعل** لو ظهرت عندكم في واتساب/في لوحة Evolution.
+2. **Evolution لازم يبلّغ n8n** إن فيه حدث رسالة: عن طريق **Webhook** = طلب **HTTP POST** من Evolution إلى **رابط الوركفلو في n8n** (عقدة `Webhook: Receive WA Message`).  
+   **لو الخطوة دي مش متحققة، الداشبورد مش هيظهر أي حاجة** — لأن الداشبورد **ما بيقراش واتساب**؛ بيقرأ جدول **`yassmin.message_log`** في Supabase **بعد** ما n8n يستدعي `ingest/message` ويكتب السطر.
+3. **n8n** يجيب الكلمات من Supabase، يطابق الرسالة، ولو فيه رد:
+   - يبعت الرد للعميل عبر **Evolution** (`HTTP: Send Reply`).
+   - يكتب في Supabase (`POST …/ingest/message`) صف في **`message_log`**: نص الرسالة، الكلمة المطابقة، نص الرد في **`reply_sent`**, والحالة مثل **`auto_replied`**.
+4. **الداشبورد** يعرض اللي في **`message_log`** (جدول «آخر الأحداث») وملخص **`chat_threads`**. استخدمي **تحديث الرسائل** أو افتحي التبويب من جديد بعد الإرسال.
+
+### ليه تحسي «الرسالة ما وصلتش لـ Evolution»؟
+
+غالبًا المقصود: **ما وصلتش لـ n8n أو للداشبورد**. الرسالة من العميل **وصلت لـ Evolution** لو واتساب شغال؛ اللي ينقطع غالبًا هو **Evolution → n8n** (رابط الويب هوك غلط، أو وركفلو مش **Active**، أو رابط **Test** بدل **Production**).
+
+### فين يظهر «تم الرد التلقائي»؟
+
+- في **Supabase**: صف `message_log` فيه **`reply_sent`** مملوء و**`status`** = `auto_replied` (أو يظهر في الملخص كـ «رد تلقائي» حسب `chat_threads`).
+- لو الرد **اتمنع** (dedup، إيقاف مؤقت، فلتر): ممكن يظهر سطر بحالة تانية (`dedup_blocked`, `inbound_filtered`, …) — المهم إن **في تنفيذ n8n** و**في استدعاء ingest** يظهر السبب.
+
+### قائمة تحقق سريعة
+
+| # | تحققي من |
+|---|----------|
+| 1 | جلسة واتساب على Evolution شغالة |
+| 2 | في Evolution: Webhook يشير إلى **Production URL** من n8n + الوركفلو **مفعّل** |
+| 3 | بعد رسالة من عميل: **Executions** في n8n فيه تنفيذ جديد؟ |
+| 4 | داخل التنفيذ: عُقد **`HTTP: DB Ingest Message*`** ناجحة (مش حمراء)؟ |
+| 5 | الداشبورد → **الرسائل** → **تحديث** — أو افتحي جدول `yassmin.message_log` من Supabase |
+
 ## متغيرات بيئة n8n
 
 - `SUPABASE_ANON_KEY` — مطلوب لجميع طلبات `yassmin-dashboard-api` و`yassmin-payments-api`.
