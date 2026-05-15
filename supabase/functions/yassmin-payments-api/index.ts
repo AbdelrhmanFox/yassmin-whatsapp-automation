@@ -215,8 +215,21 @@ Deno.serve(async (req) => {
     if (req.method === "PATCH" && patchMatch) {
       const key = decodeURIComponent(patchMatch[1]);
       const body = await req.json().catch(() => ({}));
-      const patch: Record<string, unknown> = { done: body.done === true };
-      if (!body.done && body.resetWhatsapp !== false) {
+      const patch: Record<string, unknown> = {};
+      if (body.done !== undefined) patch.done = body.done === true;
+      if (body.whatsapp_status !== undefined) {
+        patch.whatsapp_status = norm(body.whatsapp_status) || null;
+      }
+      if (body.whatsapp_last_error !== undefined) {
+        patch.whatsapp_last_error = norm(body.whatsapp_last_error) || null;
+      }
+      if (body.whatsapp_sent_at !== undefined) {
+        patch.whatsapp_sent_at = body.whatsapp_sent_at || null;
+      }
+      if (Object.keys(patch).length === 0) {
+        return json(400, { ok: false, error: "empty_patch" });
+      }
+      if (body.done === false && body.resetWhatsapp !== false) {
         patch.whatsapp_status = null;
         patch.whatsapp_last_error = null;
         patch.whatsapp_sent_at = null;

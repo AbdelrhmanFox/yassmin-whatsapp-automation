@@ -13,13 +13,13 @@ const {
   getProvider,
   PAYMENT_SPREADSHEET_ID
 } = require('./lib/payments-store');
+const { triggerPaymentSendNow } = require('./lib/trigger-payment-send');
 const {
   listThreads,
   setRoutingMode,
   ingestMessage,
   ingestPausedChat
 } = require('./lib/messages-store');
-const { listThreads, setRoutingMode, ingestMessage, ingestPausedChat } = require('./lib/messages-store');
 
 const PORT = Number(process.env.DASHBOARD_PORT || 8088);
 const ADMIN_TOKEN = process.env.DASHBOARD_ADMIN_TOKEN || 'change-me';
@@ -255,6 +255,61 @@ async function handlePaymentPatch(req, res, timestamp) {
   }
 }
 
+async function handlePaymentSendNow(req, res, timestamp) {
+  if (!isAuthorized(req)) {
+    sendJson(res, 401, { ok: false, error: 'unauthorized' });
+    return;
+  }
+  const formTimestamp = decodeURIComponent(timestamp);
+  try {
+    const listed = await listPayments({ q: formTimestamp, status: 'all' });
+    const row = (listed.rows || []).find(
+      (r) => String(r.id || r.timestamp || '').trim() === formTimestamp
+    );
+    if (!row) {
+      sendJson(res, 404, { ok: false, error: 'payment_row_not_found' });
+      return;
+    }
+    if (!row.done) {
+      sendJson(res, 422, {
+        ok: false,
+        error: 'payment_not_confirmed',
+        message: 'فعّلي «تم التأكيد» أولاً ثم اضغطي إرسال واتساب الآن'
+      });
+      return;
+    }
+    if (String(row.whatsapp_status || '').toLowerCase() === 'sent') {
+      sendJson(res, 409, {
+        ok: false,
+        error: 'already_sent',
+        message: 'تم إرسال واتساب مسبقاً لهذا الطلب'
+      });
+      return;
+    }
+    const result = await triggerPaymentSendNow(formTimestamp);
+    const refreshed = await listPayments();
+    sendJson(res, 200, {
+      ok: true,
+      message: 'تم إرسال رسالة التأكيد + PDF على واتساب',
+      sent: true,
+      form_timestamp: formTimestamp,
+      latencyMs: result.latencyMs,
+      stats: refreshed.stats,
+      rows: refreshed.rows
+    });
+  } catch (error) {
+    if (error.code === 'CONFIG') {
+      sendJson(res, 503, { ok: false, error: error.message, hint: error.hint });
+      return;
+    }
+    sendJson(res, 422, {
+      ok: false,
+      error: error.message,
+      details: error.details
+    });
+  }
+}
+
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, `http://${req.headers.host}`);
 
@@ -317,6 +372,12 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/api/payments') {
     await handlePaymentsList(req, res);
+    return;
+  }
+
+  const sendNowMatch = url.pathname.match(/^\/api\/payments\/([^/]+)\/send-now$/);
+  if (req.method === 'POST' && sendNowMatch) {
+    await handlePaymentSendNow(req, res, sendNowMatch[1]);
     return;
   }
 

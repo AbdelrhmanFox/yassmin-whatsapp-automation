@@ -1,0 +1,76 @@
+const { listPayments } = require('../../../dashboard/lib/payments-store');
+const { triggerPaymentSendNow } = require('../../../dashboard/lib/trigger-payment-send');
+const { sendJson, requireAuth } = require('../../_helpers');
+
+module.exports = async (req, res) => {
+  if (req.method === 'OPTIONS') {
+    res.status(204).end();
+    return;
+  }
+  if (req.method !== 'POST') {
+    sendJson(res, 405, { ok: false, error: 'method_not_allowed' });
+    return;
+  }
+  if (!requireAuth(req, res)) return;
+
+  const id = req.query.id;
+  if (!id) {
+    sendJson(res, 400, { ok: false, error: 'missing_payment_id' });
+    return;
+  }
+
+  const formTimestamp = decodeURIComponent(id);
+
+  try {
+    const listed = await listPayments({ q: formTimestamp, status: 'all' });
+    const row = (listed.rows || []).find(
+      (r) => String(r.id || r.timestamp || '').trim() === formTimestamp
+    );
+    if (!row) {
+      sendJson(res, 404, { ok: false, error: 'payment_row_not_found' });
+      return;
+    }
+    if (!row.done) {
+      sendJson(res, 422, {
+        ok: false,
+        error: 'payment_not_confirmed',
+        message: 'فعّلي «تم التأكيد» أولاً ثم اضغطي إرسال واتساب الآن'
+      });
+      return;
+    }
+    if (String(row.whatsapp_status || '').toLowerCase() === 'sent') {
+      sendJson(res, 409, {
+        ok: false,
+        error: 'already_sent',
+        message: 'تم إرسال واتساب مسبقاً لهذا الطلب'
+      });
+      return;
+    }
+
+    const result = await triggerPaymentSendNow(formTimestamp);
+    const refreshed = await listPayments();
+    sendJson(res, 200, {
+      ok: true,
+      message: 'تم إرسال رسالة التأكيد + PDF على واتساب',
+      sent: true,
+      form_timestamp: formTimestamp,
+      latencyMs: result.latencyMs,
+      stats: refreshed.stats,
+      rows: refreshed.rows
+    });
+  } catch (error) {
+    if (error.code === 'CONFIG') {
+      sendJson(res, 503, { ok: false, error: error.message, hint: error.hint });
+      return;
+    }
+    if (error.code === 'VALIDATION') {
+      sendJson(res, 400, { ok: false, error: error.message });
+      return;
+    }
+    sendJson(res, 422, {
+      ok: false,
+      error: error.message,
+      details: error.details
+    });
+  }
+};

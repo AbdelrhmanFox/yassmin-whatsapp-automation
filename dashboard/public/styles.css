@@ -272,6 +272,15 @@ pre {
 }
 .btn-sm.btn-warn { border-color: #b45309; color: #fcd34d; }
 .btn-sm.btn-ok { border-color: #047857; color: #6ee7b7; }
+.btn-sm.btn-send-now {
+  border-color: #7c3aed;
+  color: #e9d5ff;
+  background: rgba(124, 58, 237, 0.15);
+  white-space: nowrap;
+}
+.btn-sm.btn-send-now:hover:not(:disabled) { background: rgba(124, 58, 237, 0.35); }
+.send-now-hint { font-size: 0.75rem; color: #94a3b8; }
+.send-now-cell { white-space: nowrap; }
 .btn-sm:disabled { opacity: 0.5; cursor: not-allowed; }
 .muted { color: var(--muted); font-size: 0.75rem; }
 .hidden { display: none !important; }

@@ -124,9 +124,27 @@ function renderStats(stats) {
   statFailed.textContent = (stats.failed ?? 0) + (stats.dead_letter ?? 0);
 }
 
+function canSendNow(row) {
+  if (!row.done) return false;
+  const wa = String(row.whatsapp_status || '').toLowerCase();
+  if (wa === 'sent') return false;
+  if (wa === 'dead_letter' || row.dead_letter) return false;
+  return true;
+}
+
+function sendNowButton(row) {
+  if (!canSendNow(row)) {
+    const wa = String(row.whatsapp_status || '').toLowerCase();
+    if (wa === 'sent') return '<span class="send-now-hint">تم الإرسال</span>';
+    if (!row.done) return '<span class="send-now-hint">أكّدي أولاً</span>';
+    return '<span class="send-now-hint">—</span>';
+  }
+  return `<button type="button" class="btn-sm btn-send-now" data-id="${escapeHtml(row.id)}" title="إرسال تأكيد الدفع + PDF فوراً">إرسال الآن</button>`;
+}
+
 function renderTable(rows) {
   if (!rows.length) {
-    paymentsBody.innerHTML = '<tr><td colspan="10" class="empty">لا توجد عمليات دفع بعد</td></tr>';
+    paymentsBody.innerHTML = '<tr><td colspan="11" class="empty">لا توجد عمليات دفع بعد</td></tr>';
     return;
   }
 
@@ -150,6 +168,7 @@ function renderTable(rows) {
             <span class="slider"></span>
           </label>
         </td>
+        <td class="send-now-cell">${sendNowButton(row)}</td>
         <td>${statusBadge(waStatus)}</td>
         <td class="note" title="${escapeHtml(note)}">${escapeHtml(note)}</td>
       </tr>`;
@@ -158,6 +177,9 @@ function renderTable(rows) {
 
   paymentsBody.querySelectorAll('.done-toggle').forEach((input) => {
     input.addEventListener('change', () => onToggleDone(input));
+  });
+  paymentsBody.querySelectorAll('.btn-send-now').forEach((btn) => {
+    btn.addEventListener('click', () => onSendNow(btn));
   });
 }
 
@@ -173,7 +195,7 @@ async function fetchPayments() {
 }
 
 async function loadPayments() {
-  paymentsBody.innerHTML = '<tr><td colspan="10" class="empty">جاري التحميل…</td></tr>';
+  paymentsBody.innerHTML = '<tr><td colspan="11" class="empty">جاري التحميل…</td></tr>';
   try {
     const data = await fetchPayments();
     const provider = data.provider || 'supabase';
@@ -183,7 +205,7 @@ async function loadPayments() {
     renderTable(data.rows);
     await refreshEnvBanner();
   } catch (e) {
-    paymentsBody.innerHTML = `<tr><td colspan="10" class="empty error">${escapeHtml(e.message)}</td></tr>`;
+    paymentsBody.innerHTML = `<tr><td colspan="11" class="empty error">${escapeHtml(e.message)}</td></tr>`;
     showToast(e.message, 'err');
   }
 }
@@ -210,12 +232,47 @@ async function onToggleDone(input) {
     } else {
       await loadPayments();
     }
-    showToast(done ? 'تم تفعيل التأكيد — سيرسل واتساب في أقرب كرون (30 د)' : 'تم إلغاء التأكيد وإعادة ضبط واتساب');
+    showToast(
+      done
+        ? 'تم التأكيد — اضغطي «إرسال الآن» أو انتظري الكرون (30 د)'
+        : 'تم إلغاء التأكيد وإعادة ضبط واتساب'
+    );
   } catch (e) {
     input.checked = prev;
     showToast(e.message, 'err');
   } finally {
     input.disabled = false;
+  }
+}
+
+async function onSendNow(btn) {
+  const id = btn.getAttribute('data-id');
+  if (!id) return;
+  btn.disabled = true;
+  const label = btn.textContent;
+  btn.textContent = 'جاري الإرسال…';
+
+  try {
+    const res = await fetch(`/api/payments/${encodeURIComponent(id)}/send-now`, {
+      method: 'POST',
+      headers: apiHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.message || data.error || 'فشل الإرسال');
+    }
+    if (data.stats && data.rows) {
+      renderStats(data.stats);
+      renderTable(data.rows);
+    } else {
+      await loadPayments();
+    }
+    showToast(data.message || 'تم إرسال واتساب بنجاح');
+  } catch (e) {
+    showToast(e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = label;
   }
 }
 
@@ -232,7 +289,7 @@ async function refreshEnvBanner() {
       envBanner.innerHTML = `
         <strong>متصل بـ Supabase</strong> — جدول <code>yassmin.payments</code>
         ${d.supabaseEdgePayments ? ' عبر Edge Function' : ''}.
-        التعديلات فورية؛ n8n يقرأ الصفوف المؤكدة كل <strong>30 دقيقة</strong> ويرسل واتساب + PDF.
+        التعديلات فورية. استخدمي <strong>إرسال الآن</strong> للإرسال الفوري، أو انتظري الكرون كل <strong>30 دقيقة</strong>.
         <br><small>اللوحة: <a href="https://yassmin-whatsapp-automation.vercel.app" target="_blank" rel="noopener">yassmin-whatsapp-automation.vercel.app</a></small>`;
     } else if (connected && provider === 'sheets') {
       envBanner.innerHTML = `<strong>متصل بـ Google Sheets</strong> — التعديلات تُكتب في عمود <code>done</code>.`;
@@ -414,7 +471,13 @@ async function postControl(payload) {
     headers: apiHeaders(),
     body: JSON.stringify(payload)
   });
-  const data = await res.json();
+  const text = await res.text();
+  let data;
+  try {
+    data = text ? JSON.parse(text) : {};
+  } catch {
+    data = { ok: false, error: 'invalid_json', status: res.status, raw: text.slice(0, 200) };
+  }
   resultOutput.textContent = JSON.stringify(data, null, 2);
   await fetchHistory();
 }
@@ -434,7 +497,21 @@ document.getElementById('retryFailed').addEventListener('click', () =>
 
 async function fetchHistory() {
   const res = await fetch('/api/history');
-  const data = await res.json();
+  const text = await res.text();
+  if (!res.ok) {
+    historyOutput.textContent = JSON.stringify(
+      { ok: false, error: 'history_unavailable', status: res.status, detail: text.slice(0, 120) },
+      null,
+      2
+    );
+    return;
+  }
+  let data;
+  try {
+    data = text ? JSON.parse(text) : { ok: true, items: [] };
+  } catch {
+    data = { ok: false, error: 'invalid_json', raw: text.slice(0, 200) };
+  }
   historyOutput.textContent = JSON.stringify(data, null, 2);
 }
 
