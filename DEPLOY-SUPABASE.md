@@ -125,3 +125,6 @@ Header: Accept-Profile: yassmin
 
 5. **Edge Functions منفصلة**  
    تغييرات على `supabase/functions/...` **لا تُنشر مع Vercel** — لازم **`supabase functions deploy`**؛ إلا ستظل الواجهة أو n8n تضرب كودًا قديمًا على Supabase.
+
+6. **حد Hobby: 12 Serverless Function**  
+   كل ملف `api/**/*.js` (ما عدا `_*.js`) يُحسب دالة. المشروع يدمج **`/api/public/products`** و **`/api/public/payment`** في ملف واحد `api/public/[path].js` لتفادي تجاوز الحد عند إضافة ميزات جديدة.
