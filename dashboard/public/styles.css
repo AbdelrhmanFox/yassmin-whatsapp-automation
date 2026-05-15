@@ -150,7 +150,31 @@ pre {
   border-color: #334155;
   color: #f8fafc;
 }
+.sidebar-foot { display: flex; flex-direction: column; gap: 8px; }
 .sidebar-foot a { color: #60a5fa; font-size: 13px; text-decoration: none; }
+.sidebar-foot a:hover { text-decoration: underline; }
+.provider-pill {
+  font-size: 12px;
+  font-weight: 600;
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: #1e293b;
+  border: 1px solid #334155;
+  color: #94a3b8;
+  white-space: nowrap;
+}
+.provider-pill--db { color: #6ee7b7; border-color: #059669; }
+.provider-pill--edge { color: #a5b4fc; border-color: #6366f1; }
+.view-hint {
+  color: #94a3b8;
+  font-size: 14px;
+  margin: 0 0 16px;
+  line-height: 1.6;
+}
+.view-hint code { font-size: 12px; background: #0b1220; padding: 2px 6px; border-radius: 4px; }
+.data-table .small { font-size: 11px; }
+.env-banner a { color: #93c5fd; }
+.env-banner small { opacity: 0.85; }
 .main { flex: 1; padding: 20px 24px; overflow: auto; }
 .topbar {
   display: flex;

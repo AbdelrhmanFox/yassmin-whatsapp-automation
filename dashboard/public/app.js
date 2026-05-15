@@ -1,4 +1,3 @@
-const tokenInput = document.getElementById('token');
 const dryRunInput = document.getElementById('dryRun');
 const retryStatusInput = document.getElementById('retryStatus');
 const searchQInput = document.getElementById('searchQ');
@@ -8,6 +7,7 @@ const paymentsBody = document.getElementById('paymentsBody');
 const toastEl = document.getElementById('toast');
 const resultOutput = document.getElementById('resultOutput');
 const historyOutput = document.getElementById('historyOutput');
+const providerPill = document.getElementById('providerPill');
 
 const statTotal = document.getElementById('statTotal');
 const statPending = document.getElementById('statPending');
@@ -24,30 +24,17 @@ const STATUS_LABELS = {
   confirmed: 'مؤكد'
 };
 
+const PROVIDER_LABELS = {
+  supabase: 'Supabase',
+  'supabase-edge': 'Supabase Edge',
+  sheets: 'Google Sheets'
+};
+
 let searchDebounce;
-
-function loadToken() {
-  tokenInput.value = localStorage.getItem('dashboardAdminToken') || '';
-}
-
-function saveToken() {
-  localStorage.setItem('dashboardAdminToken', tokenInput.value.trim());
-}
+let autoRefreshTimer;
 
 function apiHeaders() {
-  const h = { 'Content-Type': 'application/json' };
-  const t = tokenInput.value.trim() || localStorage.getItem('dashboardAdminToken') || '';
-  if (t) h['x-admin-token'] = t;
-  return h;
-}
-
-function requireTokenForWrite() {
-  const t = tokenInput.value.trim() || localStorage.getItem('dashboardAdminToken') || '';
-  if (!t) {
-    showToast('أدخلي توكن المسؤول (DASHBOARD_ADMIN_TOKEN) في الأعلى', 'err');
-    return false;
-  }
-  return true;
+  return { 'Content-Type': 'application/json' };
 }
 
 function showToast(message, type = 'ok') {
@@ -67,8 +54,16 @@ function escapeHtml(s) {
 }
 
 function statusBadge(status) {
-  const label = STATUS_LABELS[status] || status;
-  return `<span class="badge badge--${escapeHtml(status)}">${escapeHtml(label)}</span>`;
+  const label = STATUS_LABELS[status] || status || '—';
+  const cls = STATUS_LABELS[status] ? status : 'pending_review';
+  return `<span class="badge badge--${escapeHtml(cls)}">${escapeHtml(label)}</span>`;
+}
+
+function formatProduct(row) {
+  if (row.product_label && row.product_code) {
+    return `${row.product_label} (${row.product_code})`;
+  }
+  return row.product_label || row.product_code || '—';
 }
 
 function renderStats(stats) {
@@ -82,27 +77,30 @@ function renderStats(stats) {
 
 function renderTable(rows) {
   if (!rows.length) {
-    paymentsBody.innerHTML = '<tr><td colspan="7" class="empty">لا توجد صفوف مطابقة</td></tr>';
+    paymentsBody.innerHTML = '<tr><td colspan="9" class="empty">لا توجد عمليات دفع بعد</td></tr>';
     return;
   }
 
   paymentsBody.innerHTML = rows
     .map((row) => {
-      const product = row.product_code || row.product_label || '—';
-      const note = row.whatsapp_last_error || '—';
+      const product = formatProduct(row);
+      const note = row.whatsapp_last_error || (row.whatsapp_sent_at ? `أُرسل: ${row.whatsapp_sent_at}` : '—');
+      const waStatus = row.whatsapp_status || row.status;
       const checked = row.done ? 'checked' : '';
       return `<tr data-id="${escapeHtml(encodeURIComponent(row.id))}">
         <td class="mono">${escapeHtml(row.timestamp)}</td>
         <td>${escapeHtml(row.name || '—')}</td>
+        <td class="mono small">${escapeHtml(row.email || '—')}</td>
         <td class="mono">${escapeHtml(row.phone || '—')}</td>
         <td>${escapeHtml(product)}</td>
+        <td>${escapeHtml(row.payment_method || '—')}</td>
         <td class="toggle-cell">
           <label class="switch">
             <input type="checkbox" class="done-toggle" data-id="${escapeHtml(row.id)}" ${checked} />
             <span class="slider"></span>
           </label>
         </td>
-        <td>${statusBadge(row.whatsapp_status || row.status)}</td>
+        <td>${statusBadge(waStatus)}</td>
         <td class="note" title="${escapeHtml(note)}">${escapeHtml(note)}</td>
       </tr>`;
     })
@@ -125,23 +123,22 @@ async function fetchPayments() {
 }
 
 async function loadPayments() {
-  paymentsBody.innerHTML = '<tr><td colspan="7" class="empty">جاري التحميل…</td></tr>';
+  paymentsBody.innerHTML = '<tr><td colspan="9" class="empty">جاري التحميل…</td></tr>';
   try {
     const data = await fetchPayments();
+    const provider = data.provider || 'supabase';
+    providerPill.textContent = PROVIDER_LABELS[provider] || provider;
+    providerPill.className = `provider-pill provider-pill--${provider.includes('edge') ? 'edge' : 'db'}`;
     renderStats(data.stats);
     renderTable(data.rows);
     await refreshEnvBanner();
   } catch (e) {
-    paymentsBody.innerHTML = `<tr><td colspan="7" class="empty error">${escapeHtml(e.message)}</td></tr>`;
+    paymentsBody.innerHTML = `<tr><td colspan="9" class="empty error">${escapeHtml(e.message)}</td></tr>`;
     showToast(e.message, 'err');
   }
 }
 
 async function onToggleDone(input) {
-  if (!requireTokenForWrite()) {
-    input.checked = !input.checked;
-    return;
-  }
   const id = input.getAttribute('data-id');
   const done = input.checked;
   const prev = !done;
@@ -157,9 +154,13 @@ async function onToggleDone(input) {
     if (!res.ok || !data.ok) {
       throw new Error(data.error || 'فشل التحديث');
     }
-    renderStats(data.stats);
-    renderTable(data.rows);
-    showToast(done ? 'تم تفعيل تأكيد الدفع — سيرسل واتساب في أقرب كرون' : 'تم إلغاء التأكيد وإعادة ضبط حالة واتساب');
+    if (data.stats && data.rows) {
+      renderStats(data.stats);
+      renderTable(data.rows);
+    } else {
+      await loadPayments();
+    }
+    showToast(done ? 'تم تفعيل التأكيد — سيرسل واتساب في أقرب كرون (30 د)' : 'تم إلغاء التأكيد وإعادة ضبط واتساب');
   } catch (e) {
     input.checked = prev;
     showToast(e.message, 'err');
@@ -172,18 +173,36 @@ async function refreshEnvBanner() {
   try {
     const res = await fetch('/api/health');
     const d = await res.json();
-    const sheetsOk = d.sheetsConnected;
-    envBanner.className = `env-banner ${sheetsOk ? 'env-banner--ok' : 'env-banner--warn'}`;
-    envBanner.innerHTML = sheetsOk
-      ? `<strong>متصل بـ Google Sheets</strong> — التعديلات تُكتب مباشرة في عمود <code>done</code>. الـ workflow يلتقطها كل 30 دقيقة.`
-      : `<strong>غير متصل</strong> — من مجلد المشروع شغّلي: <code>npm run sync:google-sheets</code> ثم أعيدي تشغيل اللوحة.`;
+    const provider = d.databaseProvider || '—';
+    const connected = d.supabaseConnected || d.sheetsConnected;
+
+    envBanner.className = `env-banner ${connected ? 'env-banner--ok' : 'env-banner--warn'}`;
+
+    if (connected && provider === 'supabase') {
+      envBanner.innerHTML = `
+        <strong>متصل بـ Supabase</strong> — جدول <code>yassmin.payments</code>
+        ${d.supabaseEdgePayments ? ' عبر Edge Function' : ''}.
+        التعديلات فورية؛ n8n يقرأ الصفوف المؤكدة كل <strong>30 دقيقة</strong> ويرسل واتساب + PDF.
+        <br><small>اللوحة: <a href="https://yassmin-whatsapp-automation.vercel.app" target="_blank" rel="noopener">yassmin-whatsapp-automation.vercel.app</a></small>`;
+    } else if (connected && provider === 'sheets') {
+      envBanner.innerHTML = `<strong>متصل بـ Google Sheets</strong> — التعديلات تُكتب في عمود <code>done</code>.`;
+    } else {
+      envBanner.innerHTML = `<strong>غير متصل بقاعدة البيانات</strong> — راجع متغيرات Vercel: <code>SUPABASE_URL</code> و <code>SUPABASE_PAYMENTS_FUNCTION_URL</code>.`;
+    }
   } catch (e) {
     envBanner.className = 'env-banner env-banner--warn';
     envBanner.textContent = 'تعذر الاتصال بالسيرفر: ' + e.message;
   }
 }
 
-/* Navigation */
+function startAutoRefresh() {
+  clearInterval(autoRefreshTimer);
+  autoRefreshTimer = setInterval(() => {
+    if (document.getElementById('view-payments').classList.contains('hidden')) return;
+    loadPayments();
+  }, 60_000);
+}
+
 document.querySelectorAll('.nav-item').forEach((btn) => {
   btn.addEventListener('click', () => {
     document.querySelectorAll('.nav-item').forEach((b) => b.classList.remove('active'));
@@ -193,22 +212,19 @@ document.querySelectorAll('.nav-item').forEach((btn) => {
     document.getElementById(`view-${view}`).classList.remove('hidden');
     document.getElementById('viewTitle').textContent =
       view === 'payments' ? 'عمليات الدفع' : 'تحكم الأتمتة';
+    document.getElementById('viewSubtitle').style.display = view === 'payments' ? '' : 'none';
+    if (view === 'payments') loadPayments();
   });
 });
 
-document.getElementById('refreshPayments').addEventListener('click', () => {
-  saveToken();
-  loadPayments();
-});
+document.getElementById('refreshPayments').addEventListener('click', loadPayments);
 
 searchQInput.addEventListener('input', () => {
   clearTimeout(searchDebounce);
   searchDebounce = setTimeout(loadPayments, 350);
 });
 filterStatusInput.addEventListener('change', loadPayments);
-tokenInput.addEventListener('change', saveToken);
 
-/* Operations (legacy control) */
 async function postControl(payload) {
   if (dryRunInput.checked) {
     resultOutput.textContent = JSON.stringify({ dryRun: true, payload }, null, 2);
@@ -245,6 +261,6 @@ async function fetchHistory() {
 
 document.getElementById('refreshHistory').addEventListener('click', fetchHistory);
 
-loadToken();
 loadPayments();
 fetchHistory();
+startAutoRefresh();

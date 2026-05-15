@@ -1,5 +1,5 @@
 const ADMIN_TOKEN = process.env.DASHBOARD_ADMIN_TOKEN || '';
-const DISABLE_AUTH = String(process.env.DASHBOARD_DISABLE_AUTH || 'false').toLowerCase() === 'true';
+const DISABLE_AUTH = String(process.env.DASHBOARD_DISABLE_AUTH ?? 'true').toLowerCase() === 'true';
 
 function sendJson(res, status, data) {
   res.setHeader('Content-Type', 'application/json; charset=utf-8');

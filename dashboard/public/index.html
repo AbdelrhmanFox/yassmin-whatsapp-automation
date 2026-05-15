@@ -3,16 +3,16 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Butterfly — عمليات الدفع</title>
+    <title>Yassmin — عمليات الدفع</title>
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="app-shell">
       <aside class="sidebar">
         <div class="brand">
-          <span class="brand-mark">B</span>
+          <span class="brand-mark">Y</span>
           <div>
-            <strong>Butterfly Ops</strong>
+            <strong>Yassmin Ops</strong>
             <small>لوحة عمليات الدفع</small>
           </div>
         </div>
@@ -22,11 +22,18 @@
         </nav>
         <div class="sidebar-foot">
           <a
+            id="supabaseLink"
+            href="https://supabase.com/dashboard/project/elcofahsbznfalrbjmfo/editor"
+            target="_blank"
+            rel="noopener"
+            >فتح Supabase ↗</a
+          >
+          <a
             id="sheetLink"
             href="https://docs.google.com/spreadsheets/d/1DoDcs3QnwDmkNim8OKQ7wm3I8JJoQiwhIcHamHo6a8w"
             target="_blank"
             rel="noopener"
-            >فتح شيت الدفع ↗</a
+            >شيت الدفع (نسخة احتياطية) ↗</a
           >
         </div>
       </aside>
@@ -36,12 +43,12 @@
           <div>
             <h1 id="viewTitle">عمليات الدفع</h1>
             <p id="viewSubtitle">
-              مربوطة بشيت <code>عمليات الدفع</code> و workflow n8n — عند تفعيل «تم التأكيد» يرسل البوت خلال 30
-              دقيقة
+              البيانات من <strong>Supabase</strong> (جدول <code>yassmin.payments</code>) — عند تفعيل «تم
+              التأكيد» يرسل n8n رسالة واتساب + PDF خلال 30 دقيقة
             </p>
           </div>
           <div class="topbar-actions">
-            <input id="token" type="password" placeholder="توكن المسؤول (مطلوب على Vercel)" class="token-input" />
+            <span id="providerPill" class="provider-pill">—</span>
             <button type="button" id="refreshPayments" class="btn-primary">تحديث</button>
           </div>
         </header>
@@ -54,11 +61,11 @@
             <article class="kpi-card kpi-warn"><span>بانتظار المراجعة</span><strong id="statPending">—</strong></article>
             <article class="kpi-card kpi-info"><span>مؤكد — بانتظار واتساب</span><strong id="statAwaiting">—</strong></article>
             <article class="kpi-card kpi-ok"><span>تم الإرسال</span><strong id="statSent">—</strong></article>
-            <article class="kpi-card kpi-danger"><span>فشل</span><strong id="statFailed">—</strong></article>
+            <article class="kpi-card kpi-danger"><span>فشل / Dead letter</span><strong id="statFailed">—</strong></article>
           </div>
 
           <div class="toolbar card">
-            <input id="searchQ" type="search" placeholder="بحث: اسم، إيميل، واتساب، منتج…" />
+            <input id="searchQ" type="search" placeholder="بحث: اسم، إيميل، واتساب، منتج، طابع زمني…" />
             <select id="filterStatus">
               <option value="all">كل الحالات</option>
               <option value="pending_review">بانتظار المراجعة</option>
@@ -74,17 +81,19 @@
               <table class="data-table">
                 <thead>
                   <tr>
-                    <th>التاريخ</th>
+                    <th>طابع زمني</th>
                     <th>الاسم</th>
+                    <th>البريد</th>
                     <th>واتساب</th>
                     <th>المنتج</th>
-                    <th>تم تأكيد الدفع؟</th>
+                    <th>طريقة الدفع</th>
+                    <th>تم التأكيد؟</th>
                     <th>حالة واتساب</th>
                     <th>ملاحظة</th>
                   </tr>
                 </thead>
                 <tbody id="paymentsBody">
-                  <tr><td colspan="7" class="empty">جاري التحميل…</td></tr>
+                  <tr><td colspan="9" class="empty">جاري التحميل…</td></tr>
                 </tbody>
               </table>
             </div>
@@ -92,6 +101,10 @@
         </section>
 
         <section id="view-operations" class="view hidden">
+          <p class="view-hint">
+            أوامر التحكم في workflow الـ n8n (إيقاف / استئناف / إعادة محاولة). يتطلب ضبط
+            <code>CONTROL_WEBHOOK_URL</code> على السيرفر.
+          </p>
           <div class="grid-ops">
             <div class="card">
               <h3>تشغيل وإيقاف</h3>
