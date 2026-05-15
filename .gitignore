@@ -1,0 +1,9 @@
+google-tokens.json
+node_modules/
+.env
+.env.*
+!.env.example
+/public/
+.vercel
+*.xlsx
+~$*.xlsx

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Butterfly — عمليات الدفع</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <span class="brand-mark">B</span>
+          <div>
+            <strong>Butterfly Ops</strong>
+            <small>لوحة عمليات الدفع</small>
+          </div>
+        </div>
+        <nav class="nav">
+          <button type="button" class="nav-item active" data-view="payments">عمليات الدفع</button>
+          <button type="button" class="nav-item" data-view="operations">تحكم الأتمتة</button>
+        </nav>
+        <div class="sidebar-foot">
+          <a
+            id="sheetLink"
+            href="https://docs.google.com/spreadsheets/d/1DoDcs3QnwDmkNim8OKQ7wm3I8JJoQiwhIcHamHo6a8w"
+            target="_blank"
+            rel="noopener"
+            >فتح شيت الدفع ↗</a
+          >
+        </div>
+      </aside>
+
+      <main class="main">
+        <header class="topbar">
+          <div>
+            <h1 id="viewTitle">عمليات الدفع</h1>
+            <p id="viewSubtitle">
+              مربوطة بشيت <code>عمليات الدفع</code> و workflow n8n — عند تفعيل «تم التأكيد» يرسل البوت خلال 30
+              دقيقة
+            </p>
+          </div>
+          <div class="topbar-actions">
+            <input id="token" type="password" placeholder="توكن المسؤول (مطلوب على Vercel)" class="token-input" />
+            <button type="button" id="refreshPayments" class="btn-primary">تحديث</button>
+          </div>
+        </header>
+
+        <div id="envBanner" class="env-banner env-banner--loading" role="status"></div>
+
+        <section id="view-payments" class="view active">
+          <div class="kpi-row">
+            <article class="kpi-card"><span>الإجمالي</span><strong id="statTotal">—</strong></article>
+            <article class="kpi-card kpi-warn"><span>بانتظار المراجعة</span><strong id="statPending">—</strong></article>
+            <article class="kpi-card kpi-info"><span>مؤكد — بانتظار واتساب</span><strong id="statAwaiting">—</strong></article>
+            <article class="kpi-card kpi-ok"><span>تم الإرسال</span><strong id="statSent">—</strong></article>
+            <article class="kpi-card kpi-danger"><span>فشل</span><strong id="statFailed">—</strong></article>
+          </div>
+
+          <div class="toolbar card">
+            <input id="searchQ" type="search" placeholder="بحث: اسم، إيميل، واتساب، منتج…" />
+            <select id="filterStatus">
+              <option value="all">كل الحالات</option>
+              <option value="pending_review">بانتظار المراجعة</option>
+              <option value="awaiting_whatsapp">مؤكد — لم يُرسل بعد</option>
+              <option value="sent">تم الإرسال</option>
+              <option value="failed">فشل الإرسال</option>
+              <option value="dead_letter">Dead letter</option>
+            </select>
+          </div>
+
+          <div class="card table-card">
+            <div class="table-wrap">
+              <table class="data-table">
+                <thead>
+                  <tr>
+                    <th>التاريخ</th>
+                    <th>الاسم</th>
+                    <th>واتساب</th>
+                    <th>المنتج</th>
+                    <th>تم تأكيد الدفع؟</th>
+                    <th>حالة واتساب</th>
+                    <th>ملاحظة</th>
+                  </tr>
+                </thead>
+                <tbody id="paymentsBody">
+                  <tr><td colspan="7" class="empty">جاري التحميل…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+
+        <section id="view-operations" class="view hidden">
+          <div class="grid-ops">
+            <div class="card">
+              <h3>تشغيل وإيقاف</h3>
+              <div class="btn-row">
+                <button type="button" data-action="pause">إيقاف مؤقت</button>
+                <button type="button" data-action="resume">استئناف</button>
+              </div>
+              <button type="button" id="emergencyPause" class="danger full-width">إيقاف طارئ</button>
+            </div>
+            <div class="card">
+              <h3>إعادة المحاولة</h3>
+              <select id="retryStatus">
+                <option value="failed">failed</option>
+                <option value="dead_letter">dead_letter</option>
+              </select>
+              <button type="button" id="retryFailed" class="full-width">إعادة المحاولة</button>
+            </div>
+            <div class="card">
+              <h3>سجل الإجراءات</h3>
+              <button type="button" id="refreshHistory" class="full-width secondary">تحديث السجل</button>
+              <pre id="historyOutput" class="compact-pre"></pre>
+            </div>
+          </div>
+          <label class="inline-check">
+            <input id="dryRun" type="checkbox" />
+            معاينة فقط — لا ترسل إلى n8n
+          </label>
+          <pre id="resultOutput" class="compact-pre"></pre>
+        </section>
+      </main>
+    </div>
+
+    <div id="toast" class="toast hidden" role="alert"></div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>

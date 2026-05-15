@@ -1,0 +1,717 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "triggerTimes": {
+          "item": [
+            {
+              "mode": "everyX",
+              "value": 30,
+              "unit": "minutes"
+            }
+          ]
+        }
+      },
+      "id": "3f6a9fb6-4f9f-4718-80b4-ec98300a4c12",
+      "name": "Cron: Every 30 Minutes",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [
+        -1728,
+        912
+      ],
+      "notesInFlow": true,
+      "notes": "Runs every 30 minutes to scan sheet rows marked Done=TRUE."
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1DoDcs3QnwDmkNim8OKQ7wm3I8JJoQiwhIcHamHo6a8w",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "product_pdf_map",
+          "mode": "name"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "a7e3c2b1-9f4e-4d2c-8c1a-0b5e6d7f8a90",
+      "name": "Sheets: Read Product PDF Map",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -1728,
+        760
+      ],
+      "alwaysOutputData": true,
+      "notesInFlow": true,
+      "notes": "Rows: product_code | pdf_url | label_ar (optional). Codes must match Form column \"product_code\" on عمليات الدفع.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HL2oexu75XGQWtzz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1DoDcs3QnwDmkNim8OKQ7wm3I8JJoQiwhIcHamHo6a8w",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "عمليات الدفع",
+          "mode": "name"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "4bb13034-6f56-4b84-8ded-9a8e1ba8f44d",
+      "name": "Sheets: Read Payment Rows",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -1728,
+        1064
+      ],
+      "alwaysOutputData": true,
+      "notesInFlow": true,
+      "notes": "Tab \"عمليات الدفع\". Google Form must include column \"product_code\" (dropdown codes). Done → confirmation + PDF from tab \"product_pdf_map\". Evolution instance: Yas.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HL2oexu75XGQWtzz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "append",
+        "options": {}
+      },
+      "id": "d5e9f3b2-4c8e-5d0f-b122-3333cccc4444",
+      "name": "Merge: Payments And Product Map",
+      "type": "n8n-nodes-base.merge",
+      "typeVersion": 3.2,
+      "position": [
+        -1540,
+        912
+      ],
+      "notesInFlow": true,
+      "notes": "Append: payment rows then product map rows. Code splits by طابع زمني vs product_code."
+    },
+    {
+      "parameters": {
+        "jsCode": "const ALL_ROWS = $input.all().map(i => i.json);\nconst MATCH_COL = \"طابع زمني\";\nconst PRODUCT_COL = \"product_code\";\nconst FIXED_CONFIRMATION = 'تم تأكيد الدفع.';\nconst DEFAULT_INSTANCE = \"Yas\";\n\nconst rows = ALL_ROWS.filter((row) => String(row[MATCH_COL] ?? '').trim() !== '');\nconst mapSourceRows = ALL_ROWS.filter((row) => {\n  const code = String(row.product_code ?? '').trim();\n  const url = String(row.pdf_url ?? '').trim();\n  return code !== '' && url !== '' && String(row[MATCH_COL] ?? '').trim() === '';\n});\n\nfunction isDone(v) {\n  const s = String(v ?? '').trim().toLowerCase();\n  return ['true', 'tru', '1', 'yes', 'done'].includes(s);\n}\n\nfunction pickDoneCell(r) {\n  const direct = r.Done ?? r.done ?? r.DONE;\n  if (direct !== undefined && direct !== null && String(direct).trim() !== '') return direct;\n  for (const k of Object.keys(r)) {\n    if (String(k).trim().toLowerCase() === 'done') return r[k];\n  }\n  return '';\n}\n\nfunction pickWhatsappPhoneFromRow(r) {\n  for (const k of Object.keys(r)) {\n    if (/واتس|whatsapp|phone|رقم/i.test(k) && /\\d/.test(String(r[k] ?? ''))) return r[k];\n  }\n  return r.phone ?? r.Phone ?? '';\n}\n\nfunction normalizeFormPhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nfunction isValidEgWhatsappPhone(phone) {\n  return /^20\\d{10}$/.test(phone);\n}\n\nfunction isPhonePaused(phone) {\n  let pausedRows = [];\n  try {\n    pausedRows = $('Sheets: Read Paused Chats (Payment)').all().map((i) => i.json);\n  } catch (_) {\n    pausedRows = [];\n  }\n  const p = normalizeFormPhone(phone);\n  if (!p) return false;\n  const now = Date.now();\n  for (const r of pausedRows) {\n    if (normalizeFormPhone(r.phone) !== p) continue;\n    if (String(r.active ?? '').trim().toUpperCase() !== 'TRUE') continue;\n    const exp = new Date(r.expires_at).getTime();\n    if (Number.isFinite(exp) && exp > now) return true;\n  }\n  return false;\n}\n\nfunction parseNumber(v, fallback = 0) {\n  const n = Number(v);\n  return Number.isFinite(n) ? n : fallback;\n}\n\nfunction minutesAgoIso(minutes) {\n  return new Date(Date.now() - minutes * 60 * 1000).toISOString();\n}\n\nconst lockOwner = 'payment-confirmation-cron';\nconst lockTimeoutMinutes = 30;\nconst maxRetriesDefault = 3;\n\nfunction normKey(s) {\n  return String(s ?? '').trim().toLowerCase();\n}\nconst pdfByCode = {};\nfor (const m of mapSourceRows) {\n  const c = normKey(m.product_code);\n  const u = String(m.pdf_url ?? '').trim();\n  if (c && u) pdfByCode[c] = u;\n}\nfunction pickProductCodeFromRow(r) {\n  const direct = r[PRODUCT_COL];\n  if (direct !== undefined && direct !== null && String(direct).trim() !== '') return String(direct).trim();\n  for (const k of Object.keys(r)) {\n    if (normKey(k) === normKey(PRODUCT_COL)) return String(r[k] ?? '').trim();\n  }\n  return '';\n}\n\nconst out = [];\n\nfor (const r of rows) {\n  const done = isDone(pickDoneCell(r));\n  const status = String(r.whatsapp_status ?? '').trim().toLowerCase();\n  const retryCount = parseNumber(r.retry_count, 0);\n  let maxRetries = parseNumber(r.max_retries, maxRetriesDefault);\n  if (!Number.isFinite(maxRetries) || maxRetries <= 0) maxRetries = maxRetriesDefault;\n  const deadLetter = String(r.dead_letter ?? '').trim().toLowerCase() === 'true';\n  const nextRetryAt = String(r.next_retry_at ?? '').trim();\n  const lockedAt = String(r.locked_at ?? '').trim();\n  const currentLockOwner = String(r.lock_owner ?? '').trim();\n\n  if (!done) continue;\n  if (status === 'sent' || status === 'dead_letter' || deadLetter) continue;\n\n  const matchKey = String(r[MATCH_COL] ?? '').trim();\n  let phone = normalizeFormPhone(pickWhatsappPhoneFromRow(r));\n  const targetInstance = String(DEFAULT_INSTANCE).trim();\n\n  let precheckError = '';\n  if (!matchKey) precheckError = 'missing_form_timestamp';\n  else if (!phone) precheckError = 'missing_phone';\n  else if (!isValidEgWhatsappPhone(phone)) precheckError = 'invalid_phone_format_expected_20XXXXXXXXXX';\n  else if (retryCount >= maxRetries) precheckError = 'max_retries_reached';\n  else if (nextRetryAt && new Date(nextRetryAt).getTime() > Date.now()) precheckError = 'waiting_next_retry_window';\n  else if (lockedAt && currentLockOwner && currentLockOwner !== lockOwner && new Date(lockedAt).getTime() > new Date(minutesAgoIso(lockTimeoutMinutes)).getTime()) precheckError = 'locked_by_other_worker';\n  else if (isPhonePaused(phone)) precheckError = 'human_handoff_paused';\n\n  const shouldSend = precheckError === '';\n  const attemptStartedAt = new Date().toISOString();\n\n  const productCodeNorm = normKey(pickProductCodeFromRow(r));\n  const pdfUrl = productCodeNorm ? (pdfByCode[productCodeNorm] || '') : '';\n  const confirmation_text = pdfUrl\n    ? FIXED_CONFIRMATION + '\\n\\nرابط تحميل الكتاب (PDF):\\n' + pdfUrl\n    : FIXED_CONFIRMATION + '\\n\\nلم يُعثر على رابط PDF لهذا الكتاب؛ سنتواصل معك لاحقًا.';\n\n  out.push({\n    json: {\n      ...r,\n      phone,\n      target_instance: targetInstance,\n      confirmation_text,\n      pdf_url: pdfUrl,\n      product_code: pickProductCodeFromRow(r),\n      processed_at: attemptStartedAt,\n      attempt_started_at: attemptStartedAt,\n      retry_count: retryCount,\n      max_retries: maxRetries,\n      lock_owner: shouldSend ? lockOwner : currentLockOwner,\n      locked_at: shouldSend ? attemptStartedAt : lockedAt,\n      should_send: shouldSend,\n      precheck_error: precheckError,\n      event_type: 'payment_confirmation',\n      stage: shouldSend ? 'ready_to_send' : 'precheck_failed',\n      result: shouldSend ? 'pending' : 'failed',\n      error_code: precheckError,\n      latency_ms: 0\n    }\n  });\n}\n\nreturn out;"
+      },
+      "id": "fb6fef8f-2c41-4f6e-99be-e4dac4d05f58",
+      "name": "Code: Filter Eligible Rows",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1320,
+        912
+      ],
+      "notesInFlow": true,
+      "notes": "Splits Merge output into payment rows vs product_pdf_map; builds confirmation + PDF link."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ready-to-send",
+              "leftValue": "={{ $json.should_send }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "60e7a6a9-8b96-4e12-8ec9-e56a80fbf49f",
+      "name": "IF: Ready To Send?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -1056,
+        1088
+      ],
+      "notesInFlow": true,
+      "notes": "Rows failing prechecks are marked failed with last_error without calling Evolution."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://evolution.growleadpro.com/message/sendText/Yas",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "9b68c406a356e217795877c96ff112b0f0a9efae58edeabc990f95b4d09f5787"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "contentType": "raw",
+        "rawContentType": "application/json",
+        "body": "={{ JSON.stringify({ number: $json.phone, text: $json.confirmation_text, delay: 1200, linkPreview: false }) }}",
+        "options": {
+          "timeout": 10000
+        }
+      },
+      "id": "830a8ab1-dd5f-433d-a3f8-331dfd5ca0af",
+      "name": "HTTP: Send Payment Confirmation",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -1056,
+        912
+      ],
+      "continueOnFail": true,
+      "notesInFlow": true,
+      "notes": "Sends payment confirmation via Evolution API. continueOnFail=true keeps flow alive per row."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "ok-send",
+              "leftValue": "={{ !$json.error }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "db3bffc5-f40c-4e7b-a37a-377a99abac24",
+      "name": "IF: Send Success?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        912
+      ],
+      "notesInFlow": true,
+      "notes": "TRUE branch: mark whatsapp_status=sent. FALSE branch: mark failed."
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1DoDcs3QnwDmkNim8OKQ7wm3I8JJoQiwhIcHamHo6a8w",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "عمليات الدفع",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "طابع زمني": "={{ $('Code: Filter Eligible Rows').item.json[\"طابع زمني\"] }}",
+            "whatsapp_status": "sent",
+            "whatsapp_last_error": "",
+            "whatsapp_sent_at": "={{ $('Code: Filter Eligible Rows').item.json.processed_at }}"
+          },
+          "matchingColumns": [
+            "طابع زمني"
+          ],
+          "schema": [
+            {
+              "id": "طابع زمني",
+              "displayName": "طابع زمني",
+              "required": false,
+              "defaultMatch": true,
+              "type": "string",
+              "display": true
+            },
+            {
+              "id": "whatsapp_status",
+              "displayName": "whatsapp_status",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string",
+              "display": true
+            },
+            {
+              "id": "whatsapp_last_error",
+              "displayName": "whatsapp_last_error",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string",
+              "display": true
+            },
+            {
+              "id": "whatsapp_sent_at",
+              "displayName": "whatsapp_sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string",
+              "display": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "f2d807fe-f5e7-4897-8991-c1a61248fb5a",
+      "name": "Sheets: Mark Sent",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -608,
+        816
+      ],
+      "notesInFlow": true,
+      "notes": "Updates row status to sent to prevent duplicate sends in future runs.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HL2oexu75XGQWtzz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "1DoDcs3QnwDmkNim8OKQ7wm3I8JJoQiwhIcHamHo6a8w",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "عمليات الدفع",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "طابع زمني": "={{ $('Code: Filter Eligible Rows').item.json[\"طابع زمني\"] }}",
+            "whatsapp_status": "failed",
+            "whatsapp_last_error": "={{ $json.precheck_error || $json.error?.message || 'send_failed' }}"
+          },
+          "matchingColumns": [
+            "طابع زمني"
+          ],
+          "schema": [
+            {
+              "id": "طابع زمني",
+              "displayName": "طابع زمني",
+              "required": false,
+              "defaultMatch": true,
+              "type": "string",
+              "display": true
+            },
+            {
+              "id": "whatsapp_status",
+              "displayName": "whatsapp_status",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string",
+              "display": true
+            },
+            {
+              "id": "whatsapp_last_error",
+              "displayName": "whatsapp_last_error",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string",
+              "display": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "0a0343b6-230f-47da-b95a-4e7b9943f13e",
+      "name": "Sheets: Mark Failed",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -608,
+        1008
+      ],
+      "notesInFlow": true,
+      "notes": "Marks failed attempts so they can be monitored and retried manually.",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HL2oexu75XGQWtzz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "documentId": {
+          "__rl": true,
+          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "paused_chats",
+          "mode": "name"
+        },
+        "options": {
+          "returnAllMatches": true
+        }
+      },
+      "id": "8fde4fa3-687e-46ae-827f-d3e89f535f0b",
+      "name": "Sheets: Read Paused Chats (Payment)",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -1728,
+        1112
+      ],
+      "alwaysOutputData": true,
+      "settings": {
+        "alwaysOutputData": true
+      },
+      "notesInFlow": true,
+      "notes": "Human handoff: skip payment WhatsApp when chat is paused (24h after manual reply).",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HL2oexu75XGQWtzz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst row = $('Code: Filter Eligible Rows').item.json;\nconst messageId =\n  resp?.key?.id ||\n  resp?.message?.key?.id ||\n  resp?.data?.key?.id ||\n  resp?.messages?.[0]?.key?.id ||\n  '';\nconst phone = String(row.phone || '').replace(/\\D/g, '');\nif (!messageId) {\n  return [{ json: { skip: true, reason: 'no_outbound_message_id' } }];\n}\nreturn [{\n  json: {\n    message_id: messageId,\n    phone,\n    source: 'payment_confirmation',\n    sent_at: new Date().toISOString(),\n    skip: false\n  }\n}];"
+      },
+      "id": "452f1038-5e9a-4849-a0fa-07a80b717ec1",
+      "name": "Code: Extract Payment Outbound Id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -832,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "has-pay-outbound",
+              "leftValue": "={{ $json.skip }}",
+              "rightValue": false,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "27adbf33-c319-4932-8133-ac85c09fe1f4",
+      "name": "IF: Has Payment Outbound Id?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -608,
+        1040
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1frBgjb61hrUrWdErjgK74wkStcF6nx2-uNfIb6ILlnY",
+          "mode": "id"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "bot_outbound",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "message_id": "={{ $json.message_id }}",
+            "phone": "={{ $json.phone }}",
+            "source": "={{ $json.source }}",
+            "sent_at": "={{ $json.sent_at }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "message_id",
+              "displayName": "message_id",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string",
+              "display": true
+            },
+            {
+              "id": "phone",
+              "displayName": "phone",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string",
+              "display": true
+            },
+            {
+              "id": "source",
+              "displayName": "source",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string",
+              "display": true
+            },
+            {
+              "id": "sent_at",
+              "displayName": "sent_at",
+              "required": false,
+              "defaultMatch": false,
+              "type": "string",
+              "display": true
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "34493e3d-c976-49e7-918f-0ce7b24e15fc",
+      "name": "Sheets: Append Payment Bot Outbound",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.4,
+      "position": [
+        -384,
+        1040
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "HL2oexu75XGQWtzz",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {},
+      "id": "43595d87-725c-4953-9428-3a3c9ab9a441",
+      "name": "No Op: No Payment Outbound Id",
+      "type": "n8n-nodes-base.noOp",
+      "typeVersion": 1,
+      "position": [
+        -608,
+        1136
+      ]
+    }
+  ],
+  "connections": {
+    "Cron: Every 30 Minutes": {
+      "main": [
+        [
+          {
+            "node": "Sheets: Read Payment Rows",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sheets: Read Product PDF Map",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Sheets: Read Paused Chats (Payment)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets: Read Payment Rows": {
+      "main": [
+        [
+          {
+            "node": "Merge: Payments And Product Map",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets: Read Product PDF Map": {
+      "main": [
+        [
+          {
+            "node": "Merge: Payments And Product Map",
+            "type": "main",
+            "index": 1
+          }
+        ]
+      ]
+    },
+    "Merge: Payments And Product Map": {
+      "main": [
+        [
+          {
+            "node": "Code: Filter Eligible Rows",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Filter Eligible Rows": {
+      "main": [
+        [
+          {
+            "node": "IF: Ready To Send?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Ready To Send?": {
+      "main": [
+        [
+          {
+            "node": "HTTP: Send Payment Confirmation",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets: Mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Send Payment Confirmation": {
+      "main": [
+        [
+          {
+            "node": "IF: Send Success?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Send Success?": {
+      "main": [
+        [
+          {
+            "node": "Code: Extract Payment Outbound Id",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Sheets: Mark Failed",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Extract Payment Outbound Id": {
+      "main": [
+        [
+          {
+            "node": "IF: Has Payment Outbound Id?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Has Payment Outbound Id?": {
+      "main": [
+        [
+          {
+            "node": "Sheets: Append Payment Bot Outbound",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Op: No Payment Outbound Id",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sheets: Append Payment Bot Outbound": {
+      "main": [
+        [
+          {
+            "node": "Sheets: Mark Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "No Op: No Payment Outbound Id": {
+      "main": [
+        [
+          {
+            "node": "Sheets: Mark Sent",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true
+  }
+}

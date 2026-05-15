@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "n8n-whatsapp-bot": {
+      "type": "http",
+      "url": "https://YOUR-N8N-DOMAIN/mcp-server/http",
+      "headers": {
+        "Authorization": "Bearer YOUR_N8N_MCP_ACCESS_TOKEN"
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+{
+  "name": "Automation Control Webhooks",
+  "nodes": [
+    {
+      "parameters": {
+        "path": "automation/control",
+        "httpMethod": "POST",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-control",
+      "name": "Webhook: Control",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $json.body || {};\nconst action = String(body.action || '').trim().toLowerCase();\nconst allowed = new Set(['pause','resume','retry_failed','update_rules']);\nif (!allowed.has(action)) {\n  return [{ json: { ok: false, error: 'unsupported_action', action } }];\n}\n\nlet response = { ok: true, action, timestamp: new Date().toISOString() };\n\nif (action === 'pause') {\n  response.state = 'paused';\n  response.note = 'Use this response to toggle your dashboard kill switch and pause scheduler/workflow activation in n8n.';\n}\n\nif (action === 'resume') {\n  response.state = 'running';\n  response.note = 'Resume scheduler/workflow activation from n8n UI or API.';\n}\n\nif (action === 'retry_failed') {\n  response.filter = body.filter || { whatsapp_status: 'failed', dead_letter: false };\n  response.note = 'Call your retry workflow path using this filter.';\n}\n\nif (action === 'update_rules') {\n  response.rule_version = Number(body.rule_version || Date.now());\n  response.note = 'Persist rules to sheet/config table and reload in processing workflows.';\n}\n\nreturn [{ json: response }];"
+      },
+      "id": "code-route",
+      "name": "Code: Route Control Action",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        320
+      ]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ $json }}",
+        "options": {}
+      },
+      "id": "respond-control",
+      "name": "Respond: Control Result",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.3,
+      "position": [
+        -240,
+        320
+      ]
+    }
+  ],
+  "connections": {
+    "Webhook: Control": {
+      "main": [
+        [
+          {
+            "node": "Code: Route Control Action",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code: Route Control Action": {
+      "main": [
+        [
+          {
+            "node": "Respond: Control Result",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {},
+  "pinData": {},
+  "meta": {
+    "instanceId": "automation-control-template"
+  }
+}
