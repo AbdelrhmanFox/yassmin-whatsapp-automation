@@ -23,6 +23,7 @@
 | `20260515140000_expose_yassmin_schema.sql` | تعرّض الـ schema لـ API |
 | `20260515150000_yassmin_receipts_storage.sql` | عمود `receipt_url` + bucket `receipts` |
 | `20260515180000_product_pdf_drive_folders.sql` | **روابط مجلدات Drive الحقيقية** لـ `inner_compass` و `voltaren_social` |
+| `20260515190000_seed_keywords_yassmin_replies.sql` | **بذرة ردود البوت** (8 قواعد + روابط النموذج `…/form.html` بدل forms.gle) |
 
 ملف الـ SQL القديم المرجعي (جزء من السلسلة أعلاه): `supabase/migrations/20260515120000_yassmin_whatsapp_init.sql`
 
