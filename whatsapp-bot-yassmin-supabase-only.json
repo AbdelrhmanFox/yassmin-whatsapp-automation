@@ -49,7 +49,7 @@
             },
             {
               "id": "c3-recent",
-              "leftValue": "={{ (Date.now() / 1000) - ($json.body?.data ?? $json.data).messageTimestamp }}",
+              "leftValue": "={{ (() => { const d = ($json.body?.data ?? $json.data) || {}; const t = Number(d.messageTimestamp); const sec = Number.isFinite(t) && t > 1e12 ? Math.floor(t / 1000) : t; if (!Number.isFinite(sec) || sec <= 0) return 9999; return (Date.now() / 1000) - sec; })() }}",
               "rightValue": 300,
               "operator": {
                 "type": "number",
@@ -83,7 +83,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Diagnose why IF: Valid Message? rejected this message\nconst d = ($json.body?.data ?? $json.data) || {};\nconst m = d.message || {};\nconst text = m.conversation ?? m.extendedTextMessage?.text ?? m.imageMessage?.caption ?? m.videoMessage?.caption ?? '';\nconst ageSeconds = Math.floor((Date.now() / 1000) - (d.messageTimestamp || 0));\nconst reasons = [];\nif (d.key?.fromMe === true) reasons.push('from_me');\nif (!text) reasons.push('no_text (type: ' + Object.keys(m)[0] + ')');\nif (ageSeconds > 300) reasons.push('too_old_' + ageSeconds + 's');\nif ((d.key?.remoteJid || '').includes('@g.us')) reasons.push('group_chat');\nreturn [{ json: {\n  invalid_reason: reasons.join(' | ') || 'unknown',\n  phone: d.key?.remoteJid || '',\n  message_id: d.key?.id || '',\n  age_seconds: ageSeconds,\n  message_type: Object.keys(m)[0] || 'none',\n  had_text: Boolean(text)\n} }];"
+        "jsCode": "// Diagnose why IF: Valid Message rejected; normalized_phone for ingest\nconst root = $json.body?.data != null ? $json.body : $json;\nconst d = (root?.data ?? root) || {};\nconst m = d.message || {};\nconst text = m.conversation ?? m.extendedTextMessage?.text ?? m.imageMessage?.caption ?? m.videoMessage?.caption ?? m.documentMessage?.caption ?? m.listResponseMessage?.title ?? m.buttonsResponseMessage?.selectedDisplayText ?? '';\nconst tsRaw = Number(d.messageTimestamp);\nconst tsSec = Number.isFinite(tsRaw) && tsRaw > 1e12 ? Math.floor(tsRaw / 1000) : tsRaw;\nconst ageSeconds = Number.isFinite(tsSec) && tsSec > 0 ? Math.floor(Date.now() / 1000 - tsSec) : -1;\nconst reasons = [];\nif (d.key?.fromMe === true) reasons.push('from_me');\nif (!text) reasons.push('no_text (type: ' + (Object.keys(m)[0] || 'none') + ')');\nif (ageSeconds > 300) reasons.push('too_old_' + ageSeconds + 's');\nif ((d.key?.remoteJid || '').includes('@g.us')) reasons.push('group_chat');\nif (!Number.isFinite(tsSec) || tsSec <= 0) reasons.push('missing_or_bad_timestamp');\nconst src = [d.sender, d.remoteJidAlt, d.key?.remoteJidAlt, d.key?.remoteJid].find(v => typeof v === 'string' && v.includes('@s.whatsapp.net')) || [d.sender, d.remoteJidAlt, d.key?.remoteJidAlt, d.key?.remoteJid].find(v => typeof v === 'string' && v.length) || '';\nlet phoneDigits = String(src).replace('@s.whatsapp.net', '').replace(/\\D/g, '');\nwhile (phoneDigits.startsWith('0020') && phoneDigits.length > 12) phoneDigits = phoneDigits.slice(2);\nif (phoneDigits.startsWith('20') && phoneDigits.length === 12) {}\nelse if (phoneDigits.startsWith('0') && phoneDigits.length === 11) phoneDigits = '20' + phoneDigits.slice(1);\nelse if (!phoneDigits.startsWith('20') && phoneDigits.length === 10) phoneDigits = '20' + phoneDigits;\nreturn [{\n  json: {\n    invalid_reason: reasons.join(' | ') || 'unknown',\n    phone: d.key?.remoteJid || '',\n    normalized_phone: phoneDigits,\n    message_id: d.key?.id || '',\n    age_seconds: ageSeconds,\n    message_type: Object.keys(m)[0] || 'none',\n    had_text: Boolean(text),\n    inbound_text: String(text || '').slice(0, 4000),\n    received_at: new Date().toISOString()\n  }\n}];"
       },
       "id": "85ee91fc-33bc-42ca-ab9d-0ab3dc672d94",
       "name": "Code: Log Invalid Reason",
@@ -95,6 +95,46 @@
         3064
       ],
       "notes": "Captures why a message was rejected. Check execution logs to see invalid_reason, age_seconds, and message_type for debugging."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg' }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + ($env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg') }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ phone: $json.normalized_phone, message: $json.inbound_text || '', keyword_matched: '[filter] ' + $json.invalid_reason, reply_sent: null, status: 'inbound_filtered', message_id: $json.message_id || null, timestamp: $json.received_at }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "f4a8b9c0-1d2e-4f3a-9b8c-7d6e5f4a3b21",
+      "name": "HTTP: DB Ingest Message (Filtered)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -53360,
+        3064
+      ],
+      "continueOnFail": true,
+      "notesInFlow": true,
+      "notes": "تسجيل واردات مرفوضة بالفلتر (يظهر في message_log والداشبورد)."
     },
     {
       "parameters": {},
@@ -308,6 +348,46 @@
         -50784,
         2968
       ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/ingest/message",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "={{ $env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg' }}"
+            },
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + ($env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg') }}"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ phone: $json.phone, message: $json.message_text, keyword_matched: '[dedup] ' + ($json.block_reason || ''), reply_sent: null, status: 'dedup_blocked', message_id: $json.message_id, timestamp: $json.received_at }) }}",
+        "options": {
+          "timeout": 20000
+        }
+      },
+      "id": "e3a7b8c9-0c1d-4e2f-8a7b-6c5d4e3f2a10",
+      "name": "HTTP: DB Ingest Message (Dedup Blocked)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -50672,
+        3064
+      ],
+      "continueOnFail": true,
+      "notesInFlow": true,
+      "notes": "تسجيل وارد صُممت إجابته لكن dedup منع الإرسال — يظهر سبب الحظر في keyword_matched."
     },
     {
       "parameters": {},
@@ -1156,6 +1236,17 @@
       "main": [
         [
           {
+            "node": "HTTP: DB Ingest Message (Filtered)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: DB Ingest Message (Filtered)": {
+      "main": [
+        [
+          {
             "node": "No Op: Invalid Message",
             "type": "main",
             "index": 0
@@ -1256,6 +1347,17 @@
             "index": 0
           }
         ],
+        [
+          {
+            "node": "HTTP: DB Ingest Message (Dedup Blocked)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: DB Ingest Message (Dedup Blocked)": {
+      "main": [
         [
           {
             "node": "No Op: Blocked",

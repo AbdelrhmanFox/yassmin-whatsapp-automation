@@ -261,6 +261,10 @@ pre {
 .badge--auto_replied { background: #064e3b; color: #6ee7b7; }
 .badge--human_handoff { background: #422006; color: #fcd34d; }
 .badge--payment_confirmation { background: #4c1d95; color: #e9d5ff; }
+.badge--human_handoff_skipped,
+.badge--paused_skipped { background: #3f2e05; color: #fcd34d; }
+.badge--inbound_filtered { background: #713f12; color: #fde68a; }
+.badge--dedup_blocked { background: #4c0b0b; color: #fecaca; }
 
 .btn-sm {
   font-size: 0.8rem;

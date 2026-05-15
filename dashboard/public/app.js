@@ -70,7 +70,9 @@ const MSG_STATUS_LABELS = {
   human_handoff: 'تحويل لرد بشري',
   payment_confirmation: 'تأكيد دفع (لوحة)',
   human_handoff_skipped: 'تخطي (إيقاف مؤقت)',
-  paused_skipped: 'تخطي مؤقت'
+  paused_skipped: 'تخطي مؤقت',
+  inbound_filtered: 'مرفوض (فلتر الويب هوك)',
+  dedup_blocked: 'لم يُرسل (حد مكافح السبام)'
 };
 
 let searchDebounce;
