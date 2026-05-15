@@ -58,7 +58,7 @@ module.exports = async (req, res) => {
         ok: false,
         error: 'whatsapp_not_marked_sent',
         message:
-          'لم يُؤكَّد الإرسال في قاعدة البيانات — راجعي تنفيذ n8n (Evolution / workflow غير مفعّل)',
+          'واتساب قد يكون أُرسل لكن قاعدة البيانات لم تُحدَّث — راجعي تنفيذ n8n (عقدة Mark Sent / PATCH)',
         upstream: result.upstream,
         latencyMs: result.latencyMs
       });
@@ -86,6 +86,7 @@ module.exports = async (req, res) => {
     sendJson(res, 422, {
       ok: false,
       error: error.message,
+      message: error.message,
       details: error.details
     });
   }

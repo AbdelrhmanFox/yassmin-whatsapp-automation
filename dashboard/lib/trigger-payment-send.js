@@ -15,7 +15,19 @@ const PRECHECK_MESSAGES = {
 };
 
 function humanizePrecheck(code) {
-  return PRECHECK_MESSAGES[code] || code || 'فشل الإرسال';
+  return PRECHECK_MESSAGES[code] || code || '';
+}
+
+function n8nFailureMessage(data, status) {
+  const msg = String(data?.message || '').trim();
+  const hint = String(data?.hint || '').trim();
+  if (status === 404 || /not registered/i.test(msg)) {
+    return (
+      'workflow إرسال الدفع غير مفعّل في n8n — افتحي «Yassmin — إرسال تأكيد الدفع فوراً» وفعّلي Active (أخضر)، ثم تأكدي أن Production URL ينتهي بـ yassmin-payment-confirm-now'
+    );
+  }
+  if (msg) return hint ? `${msg} (${hint})` : msg;
+  return `فشل الاتصال بـ n8n (HTTP ${status})`;
 }
 
 async function triggerPaymentSendNow(formTimestamp) {
@@ -59,9 +71,11 @@ async function triggerPaymentSendNow(formTimestamp) {
   const errorCode = data.error || data.precheck_error || '';
 
   if (!res.ok || data.ok === false || !sent) {
-    const err = new Error(humanizePrecheck(errorCode) || data.message || `n8n_${res.status}`);
+    const err = new Error(
+      humanizePrecheck(errorCode) || n8nFailureMessage(data, res.status)
+    );
     err.code = 'SEND_FAILED';
-    err.details = { status: res.status, error: errorCode, latencyMs, upstream: data };
+    err.details = { status: res.status, error: errorCode, latencyMs, upstream: data, webhookUrl: WEBHOOK_URL };
     throw err;
   }
 
