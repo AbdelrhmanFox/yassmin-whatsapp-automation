@@ -7,14 +7,24 @@
 | الجدول | الغرض |
 |--------|--------|
 | `yassmin.payments` | عمليات الدفع + حالة واتساب |
-| `yassmin.product_pdf_map` | ربط `product_code` → رابط PDF |
+| `yassmin.product_pdf_map` | ربط `product_code` → رابط PDF أو [مجلد Google Drive](https://drive.google.com) |
 | `yassmin.keywords` | ردود البوت |
 | `yassmin.message_log` | سجل الرسائل |
 | `yassmin.email_leads` | ليدز الإيميل |
 | `yassmin.paused_chats` | إيقاف البوت عند تدخل بشري |
 | `yassmin.bot_outbound` | تتبع رسائل البوت |
 
-ملف الـ SQL في المستودع: `supabase/migrations/20260515120000_yassmin_whatsapp_init.sql`
+ملفات الـ migration بالترتيب (طبّقي كل ما فات في **SQL Editor** أو `supabase db push`):
+
+| الملف | الغرض |
+|--------|--------|
+| `20260515120000_yassmin_whatsapp_init.sql` | إنشاء schema والجداول الأساسية |
+| `20260515130000_yassmin_chat_threads.sql` | خيوط المحادثة (إن وُجد) |
+| `20260515140000_expose_yassmin_schema.sql` | تعرّض الـ schema لـ API |
+| `20260515150000_yassmin_receipts_storage.sql` | عمود `receipt_url` + bucket `receipts` |
+| `20260515180000_product_pdf_drive_folders.sql` | **روابط مجلدات Drive الحقيقية** لـ `inner_compass` و `voltaren_social` |
+
+ملف الـ SQL القديم المرجعي (جزء من السلسلة أعلاه): `supabase/migrations/20260515120000_yassmin_whatsapp_init.sql`
 
 ## إعداد المشروع
 
