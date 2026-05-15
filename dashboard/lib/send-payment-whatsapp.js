@@ -1,4 +1,5 @@
 const { listPayments, listProducts, updatePaymentWhatsappStatus } = require('./payments-store');
+const { resolveProductPdfUrl } = require('./resolve-product-pdf-url');
 const { DASHBOARD_FUNCTION_URL } = require('./supabase');
 
 const FIXED_CONFIRMATION = 'تم تأكيد الدفع.';
@@ -36,23 +37,12 @@ function normalizePhone(v) {
   return d;
 }
 
-function buildConfirmationText(productCode, products) {
-  const pdfByCode = {};
-  for (const p of products || []) {
-    const c = String(p.product_code || '')
-      .trim()
-      .toLowerCase();
-    const u = String(p.pdf_url || '').trim();
-    if (c && u && !/REPLACE/i.test(u)) pdfByCode[c] = u;
-  }
-  const code = String(productCode || '')
-    .trim()
-    .toLowerCase();
-  const pdfUrl = code ? pdfByCode[code] || '' : '';
+function buildConfirmationText(productCode, productLabel, products) {
+  const pdfUrl = resolveProductPdfUrl(productCode, productLabel, products);
   if (pdfUrl) {
-    return `${FIXED_CONFIRMATION}\n\nرابط تحميل الكتاب (PDF):\n${pdfUrl}`;
+    return `${FIXED_CONFIRMATION}\n\nرابط تحميل الكتاب (PDF أو مجلد Drive):\n${pdfUrl}`;
   }
-  return `${FIXED_CONFIRMATION}\n\nلم يُعثر على رابط PDF لهذا الكتاب؛ سنتواصل معك لاحقًا.`;
+  return `${FIXED_CONFIRMATION}\n\nلم يُعثر على رابط تحميل لهذا الكتاب؛ سنتواصل معك لاحقًا.`;
 }
 
 async function fetchPausedChats() {
@@ -135,7 +125,7 @@ async function sendPaymentWhatsAppNow(formTimestamp) {
   if (isPhonePaused(phone, paused)) throw precheckError('human_handoff_paused');
 
   const products = await listProducts();
-  const confirmationText = buildConfirmationText(row.product_code, products);
+  const confirmationText = buildConfirmationText(row.product_code, row.product_label, products);
   const processedAt = new Date().toISOString();
 
   const startedAt = Date.now();
@@ -175,4 +165,4 @@ async function sendPaymentWhatsAppNow(formTimestamp) {
   };
 }
 
-module.exports = { sendPaymentWhatsAppNow, normalizePhone, buildConfirmationText };
+module.exports = { sendPaymentWhatsAppNow, normalizePhone, buildConfirmationText, resolveProductPdfUrl };
