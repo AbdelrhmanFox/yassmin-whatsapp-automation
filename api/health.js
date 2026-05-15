@@ -26,6 +26,7 @@ module.exports = async (req, res) => {
     paymentSpreadsheetId: PAYMENT_SPREADSHEET_ID,
     paymentSheetName: PAYMENT_SHEET,
     authDisabled: DISABLE_AUTH,
+    paymentSendWebhookConfigured: Boolean(process.env.N8N_PAYMENT_SEND_WEBHOOK_URL),
     now: new Date().toISOString()
   });
 };

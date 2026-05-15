@@ -1,4 +1,5 @@
-const WEBHOOK_URL = process.env.N8N_PAYMENT_SEND_WEBHOOK_URL || '';
+const DEFAULT_WEBHOOK_URL = 'https://n8n.growleadpro.com/webhook/yassmin-send-payment';
+const WEBHOOK_URL = (process.env.N8N_PAYMENT_SEND_WEBHOOK_URL || DEFAULT_WEBHOOK_URL).trim();
 const WEBHOOK_SECRET = process.env.N8N_WEBHOOK_SECRET || '';
 
 const PRECHECK_MESSAGES = {
@@ -24,14 +25,6 @@ async function triggerPaymentSendNow(formTimestamp) {
     err.code = 'VALIDATION';
     throw err;
   }
-  if (!WEBHOOK_URL) {
-    const err = new Error('missing_N8N_PAYMENT_SEND_WEBHOOK_URL');
-    err.code = 'CONFIG';
-    err.hint =
-      'استوردي payment-send-now-n8n-workflow.json في n8n وفعّلي الوركفلو، ثم ضيفي رابط الـ Webhook في Vercel.';
-    throw err;
-  }
-
   const headers = { 'Content-Type': 'application/json' };
   if (WEBHOOK_SECRET) headers['x-n8n-secret'] = WEBHOOK_SECRET;
 
