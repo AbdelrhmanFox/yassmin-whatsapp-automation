@@ -18,7 +18,9 @@ const PAYMENTS_USE_DIRECT_DB =
 function supabaseConfigured() {
   return Boolean(
     SUPABASE_URL &&
-      (SUPABASE_SERVICE_ROLE_KEY || (PAYMENTS_FUNCTION_URL && process.env.SUPABASE_ANON_KEY))
+      (SUPABASE_SERVICE_ROLE_KEY ||
+        (PAYMENTS_FUNCTION_URL && process.env.SUPABASE_ANON_KEY) ||
+        (process.env.SUPABASE_DASHBOARD_FUNCTION_URL && process.env.SUPABASE_ANON_KEY))
   );
 }
 
@@ -50,6 +52,12 @@ function usePaymentsEdge() {
   return Boolean(PAYMENTS_FUNCTION_URL && process.env.SUPABASE_ANON_KEY);
 }
 
+/** ردود البوت: نفس منطق RLS على yassmin.keywords — القراءة عبر yassmin-dashboard-api */
+function useKeywordsEdge() {
+  if (PAYMENTS_USE_DIRECT_DB) return false;
+  return Boolean(DASHBOARD_FUNCTION_URL && process.env.SUPABASE_ANON_KEY);
+}
+
 function hasServiceRole() {
   return Boolean(SUPABASE_SERVICE_ROLE_KEY);
 }
@@ -59,6 +67,7 @@ module.exports = {
   supabaseConfigured,
   useSupabase,
   usePaymentsEdge,
+  useKeywordsEdge,
   PAYMENTS_FUNCTION_URL,
   DASHBOARD_FUNCTION_URL,
   hasServiceRole,
