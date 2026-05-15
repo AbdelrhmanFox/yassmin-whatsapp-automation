@@ -382,9 +382,14 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const patchMatch = url.pathname.match(/^\/api\/payments\/([^/]+)$/);
-  if (req.method === 'PATCH' && patchMatch) {
-    await handlePaymentPatch(req, res, patchMatch[1]);
+  if (req.method === 'PATCH' && url.pathname === '/api/payments') {
+    const body = await readBody(req);
+    const id = url.searchParams.get('id') || url.searchParams.get('timestamp') || body.id || '';
+    if (!id) {
+      sendJson(res, 400, { ok: false, error: 'missing_payment_id' });
+      return;
+    }
+    await handlePaymentPatch(req, res, id);
     return;
   }
 

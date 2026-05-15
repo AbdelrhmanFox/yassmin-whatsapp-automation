@@ -217,7 +217,7 @@ async function onToggleDone(input) {
   input.disabled = true;
 
   try {
-    const res = await fetch(`/api/payments/${encodeURIComponent(id)}`, {
+    const res = await fetch(`/api/payments?id=${encodeURIComponent(id)}`, {
       method: 'PATCH',
       headers: apiHeaders(),
       body: JSON.stringify({ done, resetWhatsapp: true })
