@@ -1,6 +1,7 @@
 const { getSupabase, usePaymentsEdge, PAYMENTS_FUNCTION_URL, DASHBOARD_FUNCTION_URL, SCHEMA } =
   require('./supabase');
-const { buildPaymentPayload } = require('./create-payment');
+const { buildPaymentPayload, applyReceiptUrl } = require('./create-payment');
+const { uploadReceipt } = require('./receipt-storage');
 
 async function edgeFetch(path, options = {}) {
   const anon = process.env.SUPABASE_ANON_KEY || '';
@@ -61,6 +62,11 @@ function mapRow(row) {
     whatsapp_sent_at: row.whatsapp_sent_at ? String(row.whatsapp_sent_at) : '',
     retry_count: String(row.retry_count ?? ''),
     dead_letter: Boolean(row.dead_letter),
+    receipt_url:
+      norm(row.receipt_url) ||
+      norm(raw['رفع صوره الايصال']) ||
+      norm(raw['رفع صوره الايصال ']) ||
+      '',
     status: '',
     raw: { ...raw, [MATCH_COL]: row.form_timestamp, done: row.done }
   };
@@ -198,8 +204,26 @@ async function listProducts() {
   return data || [];
 }
 
+function slimPayloadForEdge(payload) {
+  const raw = { ...payload.raw };
+  delete raw.receipt_base64;
+  return {
+    form_timestamp: payload.form_timestamp,
+    name: payload.name,
+    email: payload.email,
+    phone: payload.phone,
+    product_code: payload.product_code,
+    product_label: payload.product_label,
+    payment_method: payload.payment_method,
+    receipt_url: payload.receipt_url,
+    receipt_base64: payload.receipt_base64,
+    receipt_mime: payload.receipt_mime,
+    raw
+  };
+}
+
 async function createPayment(body) {
-  const payload = buildPaymentPayload(body);
+  let payload = buildPaymentPayload(body);
 
   if (usePaymentsEdge() && DASHBOARD_FUNCTION_URL) {
     const anon = process.env.SUPABASE_ANON_KEY || '';
@@ -211,18 +235,28 @@ async function createPayment(body) {
         Authorization: `Bearer ${anon}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(payload)
+      body: JSON.stringify(slimPayloadForEdge(payload))
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok) {
-      const err = new Error(data.error || 'payment_insert_failed');
+      const err = new Error(data.error || data.message || 'payment_insert_failed');
       err.code = data.code || 'INSERT';
+      err.details = data.details;
       throw err;
     }
     return { ok: true, form_timestamp: payload.form_timestamp, ...data };
   }
 
   const supabase = getSupabase();
+  if (payload.receipt_base64 && !payload.receipt_url) {
+    const receiptUrl = await uploadReceipt(supabase, {
+      phone: payload.phone,
+      base64: payload.receipt_base64,
+      mime: payload.receipt_mime
+    });
+    payload = applyReceiptUrl(payload, receiptUrl);
+  }
+
   const row = {
     form_timestamp: payload.form_timestamp,
     name: payload.name,
@@ -231,6 +265,7 @@ async function createPayment(body) {
     product_code: payload.product_code,
     product_label: payload.product_label,
     payment_method: payload.payment_method,
+    receipt_url: payload.receipt_url,
     done: false,
     raw: payload.raw
   };

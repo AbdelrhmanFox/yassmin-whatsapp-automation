@@ -123,7 +123,12 @@ form.addEventListener('submit', async (e) => {
         product_required: 'اختر المنتج',
         payment_method_required: 'اختر طريقة الدفع',
         duplicate_submission: 'تم إرسال هذا الطلب مسبقًا',
-        receipt_too_large: 'صورة الإيصال كبيرة جدًا'
+        receipt_too_large: 'صورة الإيصال كبيرة جدًا (حد أقصى 4 ميجا)',
+        receipt_required: 'يرجى رفع صورة الإيصال',
+        receipt_upload_failed: 'تعذر حفظ صورة الإيصال — حاولي مرة أخرى',
+        payment_insert_failed: 'تعذر حفظ الطلب — تأكدي من إعدادات السيرفر أو حاولي لاحقًا',
+        unauthorized: 'السيرفر رفض الطلب — راجع إعدادات Supabase Edge',
+        validation_failed: 'بيانات غير مكتملة'
       };
       const key = (data.error || '').split(',')[0];
       showError(data.message || msgs[key] || data.error || 'تعذر الإرسال، حاولي مرة أخرى.');

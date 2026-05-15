@@ -50,7 +50,14 @@ module.exports = async (req, res) => {
       sendJson(res, 503, { ok: false, error: error.message });
       return;
     }
-    sendJson(res, 500, { ok: false, error: error.message || 'submit_failed' });
+    sendJson(res, 500, {
+      ok: false,
+      error: error.message || 'submit_failed',
+      hint:
+        error.message === 'payment_insert_failed'
+          ? 'تأكدي من نشر yassmin-dashboard-api على Supabase وتطبيق migration الإيصالات'
+          : undefined
+    });
   }
 };
 

@@ -40,6 +40,33 @@ function requireN8n(req: Request) {
   return norm(req.headers.get("x-n8n-secret")) === secret;
 }
 
+function extFromMime(mime: string) {
+  const m = mime.toLowerCase();
+  if (m.includes("png")) return "png";
+  if (m.includes("pdf")) return "pdf";
+  if (m.includes("webp")) return "webp";
+  return "jpg";
+}
+
+async function uploadReceipt(
+  supabase: ReturnType<typeof createClient>,
+  phone: string,
+  base64: string,
+  mime: string
+) {
+  const bin = Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+  if (bin.length > 5 * 1024 * 1024) throw new Error("receipt_too_large");
+  const safePhone = phone.replace(/\D/g, "") || "unknown";
+  const objectPath = `${safePhone}/${Date.now()}.${extFromMime(mime || "image/jpeg")}`;
+  const { error } = await supabase.storage.from("receipts").upload(objectPath, bin, {
+    contentType: mime || "application/octet-stream",
+    upsert: false
+  });
+  if (error) throw error;
+  const { data } = supabase.storage.from("receipts").getPublicUrl(objectPath);
+  return data.publicUrl;
+}
+
 function deriveThreadStatus(thread: Record<string, unknown>) {
   const until = thread.human_handoff_until ? new Date(String(thread.human_handoff_until)).getTime() : 0;
   const humanActive = thread.routing_mode === "human" && (!until || until > Date.now());
@@ -57,6 +84,56 @@ Deno.serve(async (req) => {
   const path = url.pathname.replace(/^\/functions\/v1\/yassmin-dashboard-api/, "").replace(/^\/yassmin-dashboard-api/, "") || "/";
 
   try {
+    if (req.method === "POST" && path === "/ingest/payment") {
+      const body = await req.json().catch(() => ({}));
+      const phone = normPhone(body.phone);
+      if (!phone || !norm(body.name) || !norm(body.email) || !norm(body.product_code)) {
+        return json(400, { ok: false, error: "validation_failed" });
+      }
+      let receipt_url = norm(body.receipt_url);
+      if (!receipt_url && !body.receipt_base64) {
+        return json(400, { ok: false, error: "receipt_required" });
+      }
+      if (!receipt_url && body.receipt_base64) {
+        try {
+          receipt_url = await uploadReceipt(
+            supabase,
+            phone,
+            String(body.receipt_base64),
+            norm(body.receipt_mime) || "image/jpeg"
+          );
+        } catch (e) {
+          return json(400, {
+            ok: false,
+            error: e instanceof Error ? e.message : "receipt_upload_failed"
+          });
+        }
+      }
+      const raw: Record<string, unknown> =
+        body.raw && typeof body.raw === "object" ? { ...body.raw } : {};
+      if (receipt_url) raw["رفع صوره الايصال"] = receipt_url;
+      delete raw.receipt_base64;
+
+      const row = {
+        form_timestamp: norm(body.form_timestamp) || new Date().toLocaleString("ar-EG"),
+        name: norm(body.name),
+        email: norm(body.email).toLowerCase(),
+        phone,
+        product_code: norm(body.product_code),
+        product_label: norm(body.product_label) || null,
+        payment_method: norm(body.payment_method) || null,
+        receipt_url: receipt_url || null,
+        done: false,
+        raw
+      };
+      const { error } = await db.from("payments").insert(row);
+      if (error) {
+        if (error.code === "23505") return json(409, { ok: false, error: "duplicate_submission" });
+        return json(500, { ok: false, error: error.message, code: error.code });
+      }
+      return json(200, { ok: true, form_timestamp: row.form_timestamp, receipt_url });
+    }
+
     if (req.method === "POST" && path.startsWith("/ingest/")) {
       if (!requireN8n(req)) return json(401, { ok: false, error: "unauthorized" });
       const body = await req.json().catch(() => ({}));
@@ -85,31 +162,6 @@ Deno.serve(async (req) => {
           });
         }
         return json(200, { ok: true });
-      }
-
-      if (path === "/ingest/payment") {
-        const body = await req.json().catch(() => ({}));
-        const phone = normPhone(body.phone);
-        if (!phone || !norm(body.name) || !norm(body.email) || !norm(body.product_code)) {
-          return json(400, { ok: false, error: "validation_failed" });
-        }
-        const row = {
-          form_timestamp: norm(body.form_timestamp) || new Date().toLocaleString("ar-EG"),
-          name: norm(body.name),
-          email: norm(body.email).toLowerCase(),
-          phone,
-          product_code: norm(body.product_code),
-          product_label: norm(body.product_label) || null,
-          payment_method: norm(body.payment_method) || null,
-          done: false,
-          raw: body.raw && typeof body.raw === "object" ? body.raw : {}
-        };
-        const { error } = await db.from("payments").insert(row);
-        if (error) {
-          if (error.code === "23505") return json(409, { ok: false, error: "duplicate_submission" });
-          throw error;
-        }
-        return json(200, { ok: true, form_timestamp: row.form_timestamp });
       }
 
       if (path === "/ingest/paused-chat") {

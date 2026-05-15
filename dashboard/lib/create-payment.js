@@ -46,6 +46,7 @@ function buildPaymentPayload(body) {
   if (!phone || phone.length < 10) errors.push('phone_invalid');
   if (!product_code) errors.push('product_required');
   if (!payment_method) errors.push('payment_method_required');
+  if (!body.receipt_base64 && !receipt_url) errors.push('receipt_required');
 
   if (errors.length) {
     const err = new Error(errors.join(','));
@@ -71,17 +72,6 @@ function buildPaymentPayload(body) {
     submitted_at: now.toISOString()
   };
 
-  if (body.receipt_base64) {
-    const b64 = String(body.receipt_base64);
-    if (b64.length > 900_000) {
-      const err = new Error('receipt_too_large');
-      err.code = 'VALIDATION';
-      throw err;
-    }
-    raw.receipt_base64 = b64;
-    raw.receipt_mime = norm(body.receipt_mime) || 'image/jpeg';
-  }
-
   return {
     form_timestamp,
     name,
@@ -97,14 +87,23 @@ function buildPaymentPayload(body) {
     retry_count: 0,
     dead_letter: false,
     raw,
-    receipt_base64: body.receipt_base64 || null,
-    receipt_mime: body.receipt_mime || null
+    receipt_base64: body.receipt_base64 ? String(body.receipt_base64) : null,
+    receipt_mime: norm(body.receipt_mime) || 'image/jpeg',
+    receipt_url: receipt_url || null
   };
+}
+
+function applyReceiptUrl(payload, receiptUrl) {
+  if (!receiptUrl) return payload;
+  payload.receipt_url = receiptUrl;
+  payload.raw['رفع صوره الايصال'] = receiptUrl;
+  return payload;
 }
 
 module.exports = {
   norm,
   normPhone,
   formatFormTimestamp,
-  buildPaymentPayload
+  buildPaymentPayload,
+  applyReceiptUrl
 };

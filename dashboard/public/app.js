@@ -105,6 +105,16 @@ function formatProduct(row) {
   return row.product_label || row.product_code || '—';
 }
 
+function receiptCell(row) {
+  const url = row.receipt_url || '';
+  if (!url) return '—';
+  const isImg = /\.(jpe?g|png|gif|webp)(\?|$)/i.test(url) || url.includes('/storage/v1/object/public/receipts/');
+  if (isImg) {
+    return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener" class="receipt-thumb-link"><img src="${escapeHtml(url)}" alt="إيصال" class="receipt-thumb" loading="lazy" /></a>`;
+  }
+  return `<a href="${escapeHtml(url)}" target="_blank" rel="noopener">عرض الإيصال ↗</a>`;
+}
+
 function renderStats(stats) {
   if (!stats) return;
   statTotal.textContent = stats.total ?? '0';
@@ -116,7 +126,7 @@ function renderStats(stats) {
 
 function renderTable(rows) {
   if (!rows.length) {
-    paymentsBody.innerHTML = '<tr><td colspan="9" class="empty">لا توجد عمليات دفع بعد</td></tr>';
+    paymentsBody.innerHTML = '<tr><td colspan="10" class="empty">لا توجد عمليات دفع بعد</td></tr>';
     return;
   }
 
@@ -133,6 +143,7 @@ function renderTable(rows) {
         <td class="mono">${escapeHtml(row.phone || '—')}</td>
         <td>${escapeHtml(product)}</td>
         <td>${escapeHtml(row.payment_method || '—')}</td>
+        <td class="receipt-cell">${receiptCell(row)}</td>
         <td class="toggle-cell">
           <label class="switch">
             <input type="checkbox" class="done-toggle" data-id="${escapeHtml(row.id)}" ${checked} />
@@ -162,7 +173,7 @@ async function fetchPayments() {
 }
 
 async function loadPayments() {
-  paymentsBody.innerHTML = '<tr><td colspan="9" class="empty">جاري التحميل…</td></tr>';
+  paymentsBody.innerHTML = '<tr><td colspan="10" class="empty">جاري التحميل…</td></tr>';
   try {
     const data = await fetchPayments();
     const provider = data.provider || 'supabase';
@@ -172,7 +183,7 @@ async function loadPayments() {
     renderTable(data.rows);
     await refreshEnvBanner();
   } catch (e) {
-    paymentsBody.innerHTML = `<tr><td colspan="9" class="empty error">${escapeHtml(e.message)}</td></tr>`;
+    paymentsBody.innerHTML = `<tr><td colspan="10" class="empty error">${escapeHtml(e.message)}</td></tr>`;
     showToast(e.message, 'err');
   }
 }

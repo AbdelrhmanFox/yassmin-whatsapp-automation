@@ -324,6 +324,18 @@ pre {
   gap: 16px;
   margin-bottom: 16px;
 }
+.receipt-cell { min-width: 72px; }
+.receipt-thumb-link { display: inline-block; }
+.receipt-thumb {
+  max-width: 56px;
+  max-height: 56px;
+  border-radius: 6px;
+  border: 1px solid #334155;
+  object-fit: cover;
+  vertical-align: middle;
+}
+.receipt-cell a { color: #60a5fa; font-size: 13px; }
+
 @media (max-width: 900px) {
   .app-shell { flex-direction: column; }
   .sidebar { width: 100%; border-left: none; border-bottom: 1px solid #1e293b; }
