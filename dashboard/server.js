@@ -375,9 +375,10 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const sendNowMatch = url.pathname.match(/^\/api\/payments\/([^/]+)\/send-now$/);
-  if (req.method === 'POST' && sendNowMatch) {
-    await handlePaymentSendNow(req, res, sendNowMatch[1]);
+  if (req.method === 'POST' && url.pathname === '/api/payment-send-now') {
+    const body = await readBody(req);
+    const id = body.form_timestamp || body.id || url.searchParams.get('id') || '';
+    await handlePaymentSendNow(req, res, encodeURIComponent(String(id)));
     return;
   }
 

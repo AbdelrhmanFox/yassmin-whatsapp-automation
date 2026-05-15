@@ -253,9 +253,10 @@ async function onSendNow(btn) {
   btn.textContent = 'جاري الإرسال…';
 
   try {
-    const res = await fetch(`/api/payments/${encodeURIComponent(id)}/send-now`, {
+    const res = await fetch('/api/payment-send-now', {
       method: 'POST',
-      headers: apiHeaders()
+      headers: apiHeaders(),
+      body: JSON.stringify({ form_timestamp: id })
     });
     const data = await res.json();
     if (!res.ok || !data.ok) {

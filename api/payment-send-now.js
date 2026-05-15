@@ -1,6 +1,6 @@
-const { listPayments } = require('../../../dashboard/lib/payments-store');
-const { triggerPaymentSendNow } = require('../../../dashboard/lib/trigger-payment-send');
-const { sendJson, requireAuth } = require('../../_helpers');
+const { listPayments } = require('../dashboard/lib/payments-store');
+const { triggerPaymentSendNow } = require('../dashboard/lib/trigger-payment-send');
+const { sendJson, requireAuth } = require('./_helpers');
 
 module.exports = async (req, res) => {
   if (req.method === 'OPTIONS') {
@@ -13,13 +13,13 @@ module.exports = async (req, res) => {
   }
   if (!requireAuth(req, res)) return;
 
-  const id = req.query.id;
-  if (!id) {
+  const body = typeof req.body === 'string' ? JSON.parse(req.body || '{}') : req.body || {};
+  const rawId = body.form_timestamp || body.id || req.query.id || '';
+  const formTimestamp = decodeURIComponent(String(rawId).trim());
+  if (!formTimestamp) {
     sendJson(res, 400, { ok: false, error: 'missing_payment_id' });
     return;
   }
-
-  const formTimestamp = decodeURIComponent(id);
 
   try {
     const listed = await listPayments({ q: formTimestamp, status: 'all' });
