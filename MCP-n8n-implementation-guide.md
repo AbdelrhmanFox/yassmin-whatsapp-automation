@@ -1,5 +1,21 @@
 # n8n MCP Implementation Guide (Self-Hosted)
 
+## Cursor MCP — المكدس الكامل (نسخ جاهز)
+
+هذا المشروع يوفّر قالب Cursor في **`.cursor/mcp.json.example`**. انسخيه إلى **`~/.cursor/mcp.json`** (عالمي) أو **`[المشروع]/.cursor/mcp.json`** ثم عدّلي القيم:
+
+| السيرفر | المطلوب | المراجع |
+|--------|---------|---------|
+| **vercel** | OAuth من Cursor عند أول اتصال | [Vercel MCP](https://vercel.com/docs/mcp/vercel-mcp) — أو سطر واحد: `npx add-mcp https://mcp.vercel.com` |
+| **supabase** | استبدلي `YOUR_SUPABASE_PROJECT_REF` (مثال المشروع الحالي: `elcofahsbznfalrbjmfo`) وتسجيل الدخول من Cursor | [Supabase MCP](https://supabase.com/docs/guides/getting-started/mcp) — للإنتاج فكّري `read_only=true` في الـ URL |
+| **n8n** | من n8n: *Settings → Instance-level MCP*، انسخي الـ token ومسار `/mcp-server/http` | نفس الدومين المستضيف: `https://n8n.growleadpro.com` |
+
+**اختياري — توثيق المكتبات في Cursor:** أضيفي [Context7 MCP](https://context7.com) من إعدادات Cursor إن كان متاحاً لديكم.
+
+بعد الحفظ: **Cursor → Settings → Tools & MCP** → تأكدي أن كل سيرفر متصل (Needs login → تسجيل الدخول).
+
+---
+
 This guide implements the selected plan for using MCP with n8n in this project.
 
 ## Recommended Architecture

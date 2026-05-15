@@ -1,8 +1,14 @@
 {
   "mcpServers": {
-    "n8n-whatsapp-bot": {
+    "vercel": {
+      "url": "https://mcp.vercel.com"
+    },
+    "supabase": {
+      "url": "https://mcp.supabase.com/mcp?project_ref=YOUR_SUPABASE_PROJECT_REF"
+    },
+    "n8n": {
       "type": "http",
-      "url": "https://YOUR-N8N-DOMAIN/mcp-server/http",
+      "url": "https://n8n.growleadpro.com/mcp-server/http",
       "headers": {
         "Authorization": "Bearer YOUR_N8N_MCP_ACCESS_TOKEN"
       }
