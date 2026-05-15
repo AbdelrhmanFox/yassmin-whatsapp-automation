@@ -125,7 +125,7 @@ async function listThreads(filters = {}) {
     .from('message_log')
     .select('*')
     .order('logged_at', { ascending: false })
-    .limit(50);
+    .limit(60);
 
   return {
     ok: true,
@@ -287,10 +287,32 @@ async function ingestPausedChat(payload) {
   return { ok: true };
 }
 
+async function listThreadMessages(phone) {
+  const p = normPhone(phone);
+  if (!p) {
+    const err = new Error('invalid_phone');
+    err.code = 'VALIDATION';
+    throw err;
+  }
+  if (useMessagesEdge()) {
+    return edgeFetch(`/messages/thread?phone=${encodeURIComponent(p)}`);
+  }
+  const supabase = await getDb();
+  const { data, error } = await supabase
+    .from('message_log')
+    .select('*')
+    .eq('phone', p)
+    .order('logged_at', { ascending: true })
+    .limit(200);
+  if (error) throw error;
+  return { ok: true, phone: p, messages: data || [] };
+}
+
 module.exports = {
   listThreads,
   setRoutingMode,
   ingestMessage,
   ingestPausedChat,
+  listThreadMessages,
   normPhone
 };

@@ -68,6 +68,8 @@ npm run migrate:sheets-to-supabase
 - **خريطة PDF**: `product_pdf_map` حسب `product_code`
 - **paused_chats / bot_outbound / keywords**: نفس أسماء التبويبات السابقة في Sheets
 
+**لو تبويب «الرسائل» في اللوحة فاضي:** تأكدي أن workflow البوت يستدعي `POST .../yassmin-dashboard-api/ingest/message` بعد كل رسالة. لو عندك `N8N_WEBHOOK_SECRET` على دالة Edge، لازم نفس القيمة تُرسل من n8n في ترويسة `x-n8n-secret` وإلا الـ ingest يرجع 401 ولا يُسجَّل شيء في `message_log`.
+
 مثال فلتر (PostgREST):
 
 ```

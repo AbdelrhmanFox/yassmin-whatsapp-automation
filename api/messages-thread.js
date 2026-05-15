@@ -1,4 +1,4 @@
-const { listThreads } = require('../dashboard/lib/messages-store');
+const { listThreadMessages } = require('../dashboard/lib/messages-store');
 const { sendJson, requireAuth } = require('./_helpers');
 
 module.exports = async (req, res) => {
@@ -12,10 +12,14 @@ module.exports = async (req, res) => {
   }
   if (!requireAuth(req, res)) return;
 
+  const phone = String(req.query.phone || req.query.p || '').trim();
+  if (!phone) {
+    sendJson(res, 400, { ok: false, error: 'missing_phone' });
+    return;
+  }
+
   try {
-    const q = req.query.q || '';
-    const status = req.query.status || 'all';
-    const data = await listThreads({ q, status });
+    const data = await listThreadMessages(decodeURIComponent(phone));
     sendJson(res, 200, data);
   } catch (error) {
     sendJson(res, 500, { ok: false, error: error.message });

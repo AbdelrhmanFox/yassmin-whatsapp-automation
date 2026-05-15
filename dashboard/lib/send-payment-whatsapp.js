@@ -1,4 +1,5 @@
 const { listPayments, listProducts, updatePaymentWhatsappStatus } = require('./payments-store');
+const { ingestMessage } = require('./messages-store');
 const { resolveProductPdfUrl } = require('./resolve-product-pdf-url');
 const { DASHBOARD_FUNCTION_URL } = require('./supabase');
 
@@ -133,6 +134,20 @@ async function sendPaymentWhatsAppNow(formTimestamp) {
   try {
     const sent = await evolutionSendText(phone, confirmationText);
     messageId = sent.messageId;
+    try {
+      await ingestMessage({
+        phone,
+        message: null,
+        reply_sent: confirmationText,
+        status: 'payment_confirmation',
+        message_id: messageId,
+        direction: 'outbound',
+        keyword_matched: 'dashboard_send_now',
+        timestamp: processedAt
+      });
+    } catch {
+      /* لا نمنع نجاح الدفع إن فشل السجل */
+    }
     await updatePaymentWhatsappStatus(key, {
       whatsapp_status: 'sent',
       whatsapp_last_error: '',

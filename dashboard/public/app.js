@@ -19,6 +19,10 @@ const msgSearchQInput = document.getElementById('msgSearchQ');
 const msgFilterStatusInput = document.getElementById('msgFilterStatus');
 const messagesBody = document.getElementById('messagesBody');
 const recentMessagesBody = document.getElementById('recentMessagesBody');
+const threadPanel = document.getElementById('threadPanel');
+const threadPhoneEl = document.getElementById('threadPhone');
+const threadBubblesEl = document.getElementById('threadBubbles');
+const closeThreadPanelBtn = document.getElementById('closeThreadPanel');
 const msgStatTotal = document.getElementById('msgStatTotal');
 const msgStatAuto = document.getElementById('msgStatAuto');
 const msgStatHuman = document.getElementById('msgStatHuman');
@@ -44,7 +48,10 @@ const PROVIDER_LABELS = {
 const MSG_STATUS_LABELS = {
   received: 'رسالة واردة',
   auto_replied: 'رد تلقائي',
-  human_handoff: 'تحويل لرد بشري'
+  human_handoff: 'تحويل لرد بشري',
+  payment_confirmation: 'تأكيد دفع (لوحة)',
+  human_handoff_skipped: 'تخطي (إيقاف مؤقت)',
+  paused_skipped: 'تخطي مؤقت'
 };
 
 let searchDebounce;
@@ -323,7 +330,7 @@ function renderMessagesTable(threads) {
       const actionBtn = human
         ? `<button type="button" class="btn-sm btn-ok" data-action="auto" data-phone="${escapeHtml(row.phone)}">تفعيل الرد التلقائي</button>`
         : `<button type="button" class="btn-sm btn-warn" data-action="human" data-phone="${escapeHtml(row.phone)}">تحويل لرد بشري</button>`;
-      return `<tr data-phone="${escapeHtml(row.phone)}">
+      return `<tr class="msg-thread-row" data-phone="${escapeHtml(row.phone)}" title="اضغطي لعرض سجل المحادثة كاملاً">
         <td class="mono">${escapeHtml(row.phone)}</td>
         <td title="${escapeHtml(row.last_inbound_text)}">${escapeHtml(truncate(row.last_inbound_text))}<br><small class="muted">${escapeHtml(formatWhen(row.last_inbound_at || row.last_message_at))}</small></td>
         <td title="${escapeHtml(row.last_reply_text)}">${escapeHtml(truncate(row.last_reply_text || '—'))}</td>
@@ -334,24 +341,39 @@ function renderMessagesTable(threads) {
     .join('');
 
   messagesBody.querySelectorAll('button[data-action]').forEach((btn) => {
-    btn.addEventListener('click', () => onRoutingAction(btn));
+    btn.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      onRoutingAction(btn);
+    });
   });
+  messagesBody.querySelectorAll('tr.msg-thread-row').forEach((tr) => {
+    tr.addEventListener('click', () => openMessageThread(tr.getAttribute('data-phone')));
+  });
+}
+
+function msgDirectionLabel(row) {
+  const d = (row.direction || '').toLowerCase();
+  if (d === 'outbound') return 'صادر';
+  return 'وارد';
 }
 
 function renderRecentMessages(rows) {
   if (!rows.length) {
-    recentMessagesBody.innerHTML = '<tr><td colspan="5" class="empty">لا أحداث بعد</td></tr>';
+    recentMessagesBody.innerHTML = '<tr><td colspan="6" class="empty">لا أحداث بعد</td></tr>';
     return;
   }
 
   recentMessagesBody.innerHTML = rows
     .map((row) => {
       const status = row.status || (row.reply_sent ? 'auto_replied' : 'received');
+      const inbound = row.message ? truncate(row.message, 72) : '—';
+      const outbound = row.reply_sent ? truncate(row.reply_sent, 72) : '—';
       return `<tr>
         <td class="mono small">${escapeHtml(formatWhen(row.logged_at || row.timestamp))}</td>
         <td class="mono">${escapeHtml(row.phone || '—')}</td>
-        <td title="${escapeHtml(row.message)}">${escapeHtml(truncate(row.message))}</td>
-        <td>${escapeHtml(row.keyword_matched || '—')}</td>
+        <td class="small muted">${escapeHtml(msgDirectionLabel(row))}</td>
+        <td title="${escapeHtml(row.message)}">${escapeHtml(inbound)}</td>
+        <td title="${escapeHtml(row.reply_sent)}">${escapeHtml(outbound)}</td>
         <td>${msgStatusBadge(status)}</td>
       </tr>`;
     })
@@ -367,6 +389,51 @@ async function fetchMessages() {
     throw new Error(data.error || data.hint || 'فشل تحميل الرسائل');
   }
   return data;
+}
+
+async function openMessageThread(phone) {
+  if (!phone || !threadPanel || !threadBubblesEl) return;
+  threadPhoneEl.textContent = phone;
+  threadBubblesEl.innerHTML = '<p class="empty muted">جاري التحميل…</p>';
+  threadPanel.classList.remove('hidden');
+  threadPanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  try {
+    const res = await fetch(`/api/messages/thread?phone=${encodeURIComponent(phone)}`, {
+      headers: apiHeaders()
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'فشل تحميل المحادثة');
+    }
+    renderMessageThreadBubbles(data.messages || []);
+  } catch (e) {
+    threadBubblesEl.innerHTML = `<p class="empty error">${escapeHtml(e.message)}</p>`;
+  }
+}
+
+function renderMessageThreadBubbles(messages) {
+  if (!messages.length) {
+    threadBubblesEl.innerHTML =
+      '<p class="empty muted">لا يوجد سجل بعد. تأكدي أن workflow البوت يستدعي <code>ingest/message</code> أو جرّبي «إرسال الآن» من الدفعات.</p>';
+    return;
+  }
+  const parts = [];
+  for (const row of messages) {
+    const t = formatWhen(row.logged_at);
+    const msg = String(row.message || '').trim();
+    const reply = String(row.reply_sent || '').trim();
+    if (msg) {
+      parts.push(
+        `<div class="thread-bubble thread-bubble--in"><div class="thread-bubble-meta">${escapeHtml(t)} · وارد${row.keyword_matched ? ` · ${escapeHtml(row.keyword_matched)}` : ''}</div><div class="thread-bubble-text">${escapeHtml(msg)}</div></div>`
+      );
+    }
+    if (reply) {
+      parts.push(
+        `<div class="thread-bubble thread-bubble--out"><div class="thread-bubble-meta">${escapeHtml(t)} · صادر · ${escapeHtml(row.status || '—')}</div><div class="thread-bubble-text">${escapeHtml(reply)}</div></div>`
+      );
+    }
+  }
+  threadBubblesEl.innerHTML = parts.length ? parts.join('') : '<p class="empty muted">لا نصوص مسجّلة</p>';
 }
 
 async function loadMessages() {
@@ -449,6 +516,9 @@ document.querySelectorAll('.nav-item').forEach((btn) => {
 
 document.getElementById('refreshPayments').addEventListener('click', loadPayments);
 refreshMessagesBtn?.addEventListener('click', loadMessages);
+closeThreadPanelBtn?.addEventListener('click', () => {
+  threadPanel?.classList.add('hidden');
+});
 
 msgSearchQInput?.addEventListener('input', () => {
   clearTimeout(msgSearchDebounce);

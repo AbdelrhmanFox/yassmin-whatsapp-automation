@@ -18,7 +18,8 @@ const {
   listThreads,
   setRoutingMode,
   ingestMessage,
-  ingestPausedChat
+  ingestPausedChat,
+  listThreadMessages
 } = require('./lib/messages-store');
 
 const PORT = Number(process.env.DASHBOARD_PORT || 8088);
@@ -403,6 +404,25 @@ const server = http.createServer(async (req, res) => {
       const q = url.searchParams.get('q') || '';
       const status = url.searchParams.get('status') || 'all';
       const data = await listThreads({ q, status });
+      sendJson(res, 200, data);
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: error.message });
+    }
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/messages/thread') {
+    if (!isAuthorized(req)) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      return;
+    }
+    const phone = url.searchParams.get('phone') || url.searchParams.get('p') || '';
+    if (!phone.trim()) {
+      sendJson(res, 400, { ok: false, error: 'missing_phone' });
+      return;
+    }
+    try {
+      const data = await listThreadMessages(decodeURIComponent(phone));
       sendJson(res, 200, data);
     } catch (error) {
       sendJson(res, 500, { ok: false, error: error.message });

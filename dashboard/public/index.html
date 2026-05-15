@@ -122,6 +122,7 @@
             </select>
             <button type="button" id="refreshMessages" class="btn-primary hidden">تحديث الرسائل</button>
           </div>
+          <p class="view-hint" style="margin: 0 0 12px 0">اضغطي على أي صف في الجدول لعرض <strong>سجل المحادثة</strong> (وارد / صادر) لهذا الرقم.</p>
 
           <div class="card table-card">
             <div class="table-wrap">
@@ -150,16 +151,25 @@
                   <tr>
                     <th>الوقت</th>
                     <th>الرقم</th>
-                    <th>الرسالة</th>
-                    <th>كلمة مفتاحية</th>
+                    <th>الاتجاه</th>
+                    <th>وارد من العميل</th>
+                    <th>صادر / رد</th>
                     <th>الحالة</th>
                   </tr>
                 </thead>
                 <tbody id="recentMessagesBody">
-                  <tr><td colspan="5" class="empty">—</td></tr>
+                  <tr><td colspan="6" class="empty">—</td></tr>
                 </tbody>
               </table>
             </div>
+          </div>
+
+          <div id="threadPanel" class="card thread-panel hidden" style="margin-top: 16px">
+            <div class="thread-panel-head">
+              <h3 style="margin: 0">سجل المحادثة · <span id="threadPhone" class="mono"></span></h3>
+              <button type="button" id="closeThreadPanel" class="btn-sm">إغلاق ❌</button>
+            </div>
+            <div id="threadBubbles" class="thread-bubbles"></div>
           </div>
         </section>
 

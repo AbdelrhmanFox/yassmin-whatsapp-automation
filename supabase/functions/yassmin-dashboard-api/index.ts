@@ -228,7 +228,7 @@ Deno.serve(async (req) => {
       const status = url.searchParams.get("status") || "all";
       if (status !== "all") rows = rows.filter((r) => r.status === status);
       if (q) rows = rows.filter((r) => [r.phone, r.last_inbound_text, r.last_reply_text].join(" ").toLowerCase().includes(q));
-      const { data: recent } = await db.from("message_log").select("*").order("logged_at", { ascending: false }).limit(40);
+      const { data: recent } = await db.from("message_log").select("*").order("logged_at", { ascending: false }).limit(60);
       return json(200, {
         ok: true,
         provider: "supabase-edge",
@@ -242,6 +242,19 @@ Deno.serve(async (req) => {
         threads: rows,
         recent_messages: recent || []
       });
+    }
+
+    if (req.method === "GET" && path === "/messages/thread") {
+      const phone = normPhone(url.searchParams.get("phone"));
+      if (!phone) return json(400, { ok: false, error: "invalid_phone" });
+      const { data, error } = await db
+        .from("message_log")
+        .select("*")
+        .eq("phone", phone)
+        .order("logged_at", { ascending: true })
+        .limit(200);
+      if (error) throw error;
+      return json(200, { ok: true, phone, messages: data || [] });
     }
 
     const routingMatch = path.match(/^\/chats\/([^/]+)\/routing$/);
