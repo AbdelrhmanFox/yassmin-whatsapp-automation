@@ -36,18 +36,29 @@ async function triggerPaymentSendNow(formTimestamp) {
   });
 
   let data = {};
-  const text = await res.text();
+  const text = (await res.text()).trim();
+  if (!text) {
+    const err = new Error(
+      'استجابة فارغة من n8n — تأكدي أن workflow «إرسال تأكيد الدفع فوراً» مفعّل ومستورد من payment-send-now-n8n-workflow.json'
+    );
+    err.code = 'SEND_FAILED';
+    err.details = { status: res.status, error: 'n8n_empty_response', latencyMs: Date.now() - startedAt };
+    throw err;
+  }
   try {
-    data = text ? JSON.parse(text) : {};
+    data = JSON.parse(text);
   } catch {
-    data = { raw: text };
+    const err = new Error('استجابة غير صالحة من n8n');
+    err.code = 'SEND_FAILED';
+    err.details = { status: res.status, error: 'n8n_invalid_json', raw: text.slice(0, 500) };
+    throw err;
   }
 
   const latencyMs = Date.now() - startedAt;
-  const sent = Boolean(data.sent) || (data.ok === true && !data.error);
+  const sent = data.sent === true;
   const errorCode = data.error || data.precheck_error || '';
 
-  if (!res.ok || data.ok === false || data.sent === false) {
+  if (!res.ok || data.ok === false || !sent) {
     const err = new Error(humanizePrecheck(errorCode) || data.message || `n8n_${res.status}`);
     err.code = 'SEND_FAILED';
     err.details = { status: res.status, error: errorCode, latencyMs, upstream: data };
@@ -56,8 +67,9 @@ async function triggerPaymentSendNow(formTimestamp) {
 
   return {
     ok: true,
-    sent: true,
+    sent,
     form_timestamp: key,
+    message_id: data.message_id || '',
     latencyMs,
     upstream: data
   };

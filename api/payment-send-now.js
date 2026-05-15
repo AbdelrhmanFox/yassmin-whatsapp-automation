@@ -49,10 +49,26 @@ module.exports = async (req, res) => {
 
     const result = await triggerPaymentSendNow(formTimestamp);
     const refreshed = await listPayments();
+    const updated = (refreshed.rows || []).find(
+      (r) => String(r.id || r.timestamp || '').trim() === formTimestamp
+    );
+    const wa = String(updated?.whatsapp_status || '').toLowerCase();
+    if (wa !== 'sent') {
+      sendJson(res, 422, {
+        ok: false,
+        error: 'whatsapp_not_marked_sent',
+        message:
+          'لم يُؤكَّد الإرسال في قاعدة البيانات — راجعي تنفيذ n8n (Evolution / workflow غير مفعّل)',
+        upstream: result.upstream,
+        latencyMs: result.latencyMs
+      });
+      return;
+    }
     sendJson(res, 200, {
       ok: true,
       message: 'تم إرسال رسالة التأكيد + PDF على واتساب',
-      sent: true,
+      sent: result.sent,
+      message_id: result.message_id,
       form_timestamp: formTimestamp,
       latencyMs: result.latencyMs,
       stats: refreshed.stats,

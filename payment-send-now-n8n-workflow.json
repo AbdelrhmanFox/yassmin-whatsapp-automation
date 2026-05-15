@@ -23,8 +23,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
-            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" }
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" }
           ]
         },
         "options": { "timeout": 20000 }
@@ -43,8 +43,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
-            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" }
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" }
           ]
         },
         "options": { "timeout": 20000 }
@@ -63,8 +63,8 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
-            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" }
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" }
           ]
         },
         "options": { "timeout": 20000 }
@@ -78,6 +78,7 @@
     },
     {
       "parameters": {
+        "mode": "runOnceForAllItems",
         "jsCode": "const wh = $('Webhook: Send Payment Now').first().json;\nconst body = wh.body || wh;\nconst secret = String($env.N8N_WEBHOOK_SECRET || '').trim();\nif (secret) {\n  const got = String(wh.headers?.['x-n8n-secret'] || wh.headers?.['X-N8n-Secret'] || '').trim();\n  if (got !== secret) {\n    return [{ json: { ok: false, should_send: false, precheck_error: 'unauthorized', form_timestamp: '' } }];\n  }\n}\n\nconst targetTs = String(body.form_timestamp || '').trim();\nif (!targetTs) {\n  return [{ json: { ok: false, should_send: false, precheck_error: 'missing_form_timestamp', form_timestamp: '' } }];\n}\n\nconst payResp = $('HTTP: Read Payments (DB)').first().json || {};\nconst prodResp = $('HTTP: Read Products (DB)').first().json || {};\nconst pausedResp = $('HTTP: Read Paused Chats (Payment DB)').first().json || {};\n\nconst allRows = Array.isArray(payResp.rows) ? payResp.rows : [];\nconst r = allRows.find((row) => String(row.timestamp || row.id || '').trim() === targetTs);\nif (!r) {\n  return [{ json: { ok: false, should_send: false, precheck_error: 'payment_not_found', form_timestamp: targetTs } }];\n}\n\nconst FIXED_CONFIRMATION = 'تم تأكيد الدفع.';\nconst pdfByCode = {};\nfor (const p of prodResp.products || []) {\n  const c = String(p.product_code || '').trim().toLowerCase();\n  const u = String(p.pdf_url || '').trim();\n  if (c && u) pdfByCode[c] = u;\n}\n\nfunction normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nfunction isPhonePaused(phone) {\n  const rows = Array.isArray(pausedResp.rows) ? pausedResp.rows : [];\n  const p = normalizePhone(phone);\n  const now = Date.now();\n  for (const row of rows) {\n    if (normalizePhone(row.phone) !== p) continue;\n    if (row.active === false) continue;\n    const exp = new Date(row.expires_at).getTime();\n    if (Number.isFinite(exp) && exp > now) return true;\n  }\n  return false;\n}\n\nconst done = Boolean(r.done);\nconst status = String(r.whatsapp_status || '').trim().toLowerCase();\nconst phone = normalizePhone(r.phone);\nlet precheckError = '';\n\nif (!done) precheckError = 'payment_not_confirmed';\nelse if (status === 'sent') precheckError = 'already_sent';\nelse if (status === 'dead_letter') precheckError = 'dead_letter';\nelse if (!phone) precheckError = 'missing_phone';\nelse if (!/^20\\d{10}$/.test(phone)) precheckError = 'invalid_phone';\nelse if (isPhonePaused(phone)) precheckError = 'human_handoff_paused';\n\nconst productCodeNorm = String(r.product_code || '').trim().toLowerCase();\nconst pdfUrl = productCodeNorm ? (pdfByCode[productCodeNorm] || '') : '';\nconst confirmation_text = pdfUrl\n  ? FIXED_CONFIRMATION + '\\n\\nرابط تحميل الكتاب (PDF):\\n' + pdfUrl\n  : FIXED_CONFIRMATION + '\\n\\nلم يُعثر على رابط PDF لهذا الكتاب؛ سنتواصل معك لاحقًا.';\n\nconst processed_at = new Date().toISOString();\nconst should_send = precheckError === '';\n\nreturn [{\n  json: {\n    ok: true,\n    form_timestamp: targetTs,\n    phone,\n    confirmation_text,\n    pdf_url: pdfUrl,\n    product_code: r.product_code,\n    should_send,\n    precheck_error: precheckError,\n    processed_at,\n    stage: should_send ? 'ready_to_send' : 'precheck_failed'\n  }\n}];"
       },
       "id": "a1000005-0005-4005-8005-000000000005",
@@ -142,12 +143,22 @@
     },
     {
       "parameters": {
+        "jsCode": "const resp = $input.first().json;\nconst prep = $('Code: Prepare Single Payment Send').first().json;\nconst messageId =\n  resp?.key?.id ||\n  resp?.message?.key?.id ||\n  resp?.data?.key?.id ||\n  resp?.messages?.[0]?.key?.id ||\n  '';\nconst base = {\n  form_timestamp: prep.form_timestamp,\n  phone: prep.phone,\n  confirmation_text: prep.confirmation_text,\n  processed_at: prep.processed_at\n};\nif (!messageId) {\n  const errMsg =\n    resp?.error?.message ||\n    resp?.message ||\n    (resp?.error ? String(resp.error) : '') ||\n    'no_outbound_message_id';\n  return [{ json: { ...base, send_ok: false, send_error: errMsg, evolution_response: resp } }];\n}\nreturn [{ json: { ...base, send_ok: true, message_id: messageId, send_error: '' } }];"
+      },
+      "id": "a1000015-0015-4015-8015-000000000015",
+      "name": "Code: Extract Payment Outbound Id",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [40, 320]
+    },
+    {
+      "parameters": {
         "conditions": {
-          "options": { "caseSensitive": true, "typeValidation": "loose", "version": 2 },
+          "options": { "caseSensitive": true, "typeValidation": "strict", "version": 2 },
           "conditions": [
             {
               "id": "ok-send",
-              "leftValue": "={{ !$json.error }}",
+              "leftValue": "={{ $json.send_ok }}",
               "rightValue": true,
               "operator": { "type": "boolean", "operation": "equals" }
             }
@@ -160,77 +171,77 @@
       "name": "IF: Send Success?",
       "type": "n8n-nodes-base.if",
       "typeVersion": 2,
-      "position": [40, 320]
+      "position": [280, 320]
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-payments-api/{{ encodeURIComponent($('Code: Prepare Single Payment Send').item.json.form_timestamp) }}",
+        "url": "=https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-payments-api/{{ encodeURIComponent($json.form_timestamp) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
-            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" },
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ whatsapp_status: 'sent', whatsapp_last_error: '', whatsapp_sent_at: $('Code: Prepare Single Payment Send').item.json.processed_at }) }}",
+        "jsonBody": "={{ JSON.stringify({ whatsapp_status: 'sent', whatsapp_last_error: '', whatsapp_sent_at: $json.processed_at }) }}",
         "options": { "timeout": 20000 }
       },
       "id": "a1000009-0009-4009-8009-000000000009",
       "name": "HTTP: Mark Sent (DB)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [280, 240]
+      "position": [520, 240]
     },
     {
       "parameters": {
         "method": "PATCH",
-        "url": "=https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-payments-api/{{ encodeURIComponent($('Code: Prepare Single Payment Send').item.json.form_timestamp) }}",
+        "url": "=https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-payments-api/{{ encodeURIComponent($json.form_timestamp) }}",
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "apikey", "value": "={{ $env.SUPABASE_ANON_KEY }}" },
-            { "name": "Authorization", "value": "={{ 'Bearer ' + $env.SUPABASE_ANON_KEY }}" },
+            { "name": "apikey", "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" },
+            { "name": "Authorization", "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg" },
             { "name": "Content-Type", "value": "application/json" }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={{ JSON.stringify({ whatsapp_status: 'failed', whatsapp_last_error: $json.precheck_error || $json.error?.message || 'send_failed' }) }}",
+        "jsonBody": "={{ JSON.stringify({ whatsapp_status: 'failed', whatsapp_last_error: $json.send_error || $json.precheck_error || $json.error?.message || 'send_failed' }) }}",
         "options": { "timeout": 20000 }
       },
       "id": "a1000010-0010-4010-8010-000000000010",
       "name": "HTTP: Mark Failed (DB)",
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [280, 480]
+      "position": [520, 480]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { ok: true, sent: true, form_timestamp: $('Code: Prepare Single Payment Send').item.json.form_timestamp, phone: $('Code: Prepare Single Payment Send').item.json.phone } }}",
+        "responseBody": "={{ { ok: true, sent: true, message_id: $('Code: Extract Payment Outbound Id').item.json.message_id, form_timestamp: $('Code: Extract Payment Outbound Id').item.json.form_timestamp, phone: $('Code: Extract Payment Outbound Id').item.json.phone } }}",
         "options": {}
       },
       "id": "a1000011-0011-4011-8011-000000000011",
       "name": "Respond: Sent",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.3,
-      "position": [520, 240]
+      "position": [760, 240]
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={{ { ok: false, sent: false, form_timestamp: $('Code: Prepare Single Payment Send').item.json.form_timestamp, error: $('Code: Prepare Single Payment Send').item.json.precheck_error || $json.error?.message || 'send_failed' } }}",
+        "responseBody": "={{ { ok: false, sent: false, form_timestamp: $json.form_timestamp || $('Code: Prepare Single Payment Send').first().json.form_timestamp, error: $json.send_error || $json.precheck_error || $json.error?.message || 'send_failed' } }}",
         "options": { "responseCode": 422 }
       },
       "id": "a1000012-0012-4012-8012-000000000012",
       "name": "Respond: Failed",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.3,
-      "position": [520, 480]
+      "position": [760, 480]
     },
     {
       "parameters": {
@@ -277,6 +288,9 @@
       ]
     },
     "HTTP: Send Payment Confirmation": {
+      "main": [[{ "node": "Code: Extract Payment Outbound Id", "type": "main", "index": 0 }]]
+    },
+    "Code: Extract Payment Outbound Id": {
       "main": [[{ "node": "IF: Send Success?", "type": "main", "index": 0 }]]
     },
     "IF: Send Success?": {
