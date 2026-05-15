@@ -1,0 +1,75 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>تأكيد الدفع — Yassmin</title>
+    <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/form.css" />
+  </head>
+  <body class="form-page">
+    <div class="form-shell">
+      <header class="form-header">
+        <span class="brand-mark">Y</span>
+        <div>
+          <h1>تأكيد الدفع</h1>
+          <p>بعد إتمام التحويل، املئي النموذج لمراجعتنا طلبك وإرسال المنتج على واتساب.</p>
+        </div>
+      </header>
+
+      <form id="paymentForm" class="form-card" novalidate>
+        <input type="text" name="website" class="hp" tabindex="-1" autocomplete="off" aria-hidden="true" />
+
+        <label for="name">الاسم <span class="req">*</span></label>
+        <input id="name" name="name" type="text" required autocomplete="name" placeholder="الاسم الكامل" />
+
+        <label for="email">البريد الإلكتروني <span class="req">*</span></label>
+        <input id="email" name="email" type="email" required dir="ltr" placeholder="example@email.com" />
+
+        <label for="payment_method">طريقة الدفع <span class="req">*</span></label>
+        <select id="payment_method" name="payment_method" required>
+          <option value="">اختر طريقة الدفع…</option>
+          <option value="فودافون كاش/انستا باي">فودافون كاش / انستا باي</option>
+          <option value="للدفع من خارج مصر">للدفع من خارج مصر</option>
+        </select>
+
+        <label for="phone">رقم الواتساب الذي تم التواصل منه <span class="req">*</span></label>
+        <input id="phone" name="phone" type="tel" required dir="ltr" placeholder="01xxxxxxxxx" />
+
+        <label for="phone_alt">رقم واتساب إضافي (اختياري)</label>
+        <input id="phone_alt" name="phone_alt" type="tel" dir="ltr" placeholder="01xxxxxxxxx" />
+
+        <label for="product_code">المنتج <span class="req">*</span></label>
+        <select id="product_code" name="product_code" required>
+          <option value="">جاري تحميل المنتجات…</option>
+        </select>
+
+        <label for="product_label">ملاحظات / محتاج إيه؟ (اختياري)</label>
+        <textarea id="product_label" name="product_label" rows="2" placeholder="أي تفاصيل إضافية…"></textarea>
+
+        <label for="receipt">صورة إيصال التحويل <span class="req">*</span></label>
+        <input id="receipt" name="receipt" type="file" accept="image/*,.pdf" required />
+        <p class="hint">صورة واضحة للإيصال — JPG أو PNG أو PDF (حد أقصى 4 ميجا)</p>
+
+        <label class="inline-check">
+          <input type="checkbox" id="confirm" required />
+          <span>أؤكد أن بيانات الدفع صحيحة وأن رقم الواتساب يعمل لاستلام المنتج.</span>
+        </label>
+
+        <button type="submit" id="submitBtn" class="btn-submit">إرسال الطلب</button>
+        <p id="formError" class="form-error hidden" role="alert"></p>
+      </form>
+
+      <section id="formSuccess" class="form-success hidden">
+        <h2>تم الإرسال بنجاح</h2>
+        <p id="successMsg">شكرًا! سيظهر طلبك عند فريق العمل فورًا للمراجعة.</p>
+        <button type="button" class="btn-secondary" id="sendAnother">إرسال طلب آخر</button>
+      </section>
+
+      <footer class="form-foot">
+        <small>البيانات تُحفظ بأمان — لا تشاركي بيانات البطاقة هنا، فقط إيصال التحويل.</small>
+      </footer>
+    </div>
+    <script src="/form.js"></script>
+  </body>
+</html>

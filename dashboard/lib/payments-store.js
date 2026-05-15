@@ -18,9 +18,25 @@ async function updatePaymentDone(timestamp, done, options) {
   return activeStore().updatePaymentDone(timestamp, done, options);
 }
 
+async function createPayment(body) {
+  if (!useSupabase()) {
+    const err = new Error('supabase_required_for_public_form');
+    err.code = 'CONFIG';
+    throw err;
+  }
+  return supabaseStore.createPayment(body);
+}
+
+async function listProducts() {
+  if (!useSupabase()) return [];
+  return supabaseStore.listProducts();
+}
+
 module.exports = {
   listPayments,
   updatePaymentDone,
+  createPayment,
+  listProducts,
   readPaymentSheet: () =>
     useSupabase() ? supabaseStore.readPayments() : sheetsStore.readPaymentSheet(),
   summarize: (rows) =>

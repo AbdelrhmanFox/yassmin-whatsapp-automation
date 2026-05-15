@@ -8,6 +8,8 @@ const { supabaseConfigured } = require('./lib/supabase');
 const {
   listPayments,
   updatePaymentDone,
+  createPayment,
+  listProducts,
   getProvider,
   PAYMENT_SPREADSHEET_ID
 } = require('./lib/payments-store');
@@ -273,6 +275,43 @@ const server = http.createServer(async (req, res) => {
 
   if (req.method === 'GET' && url.pathname === '/api/metrics') {
     await handleMetrics(res);
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/public/products') {
+    try {
+      let products = await listProducts();
+      if (!products.length) {
+        products = [
+          { product_code: 'inner_compass', label_ar: 'كتاب بوصلتك الداخلية' },
+          { product_code: 'voltaren_social', label_ar: 'كتاب فولتارين السوشيال ميديا' }
+        ];
+      }
+      sendJson(res, 200, { ok: true, products });
+    } catch (e) {
+      sendJson(res, 500, { ok: false, error: e.message });
+    }
+    return;
+  }
+
+  if (req.method === 'POST' && url.pathname === '/api/public/payment') {
+    try {
+      const body = await readBody(req);
+      if (String(body.website || '').trim()) {
+        sendJson(res, 400, { ok: false, error: 'spam_rejected' });
+        return;
+      }
+      const data = await createPayment(body);
+      sendJson(res, 201, {
+        ok: true,
+        message:
+          'تم استلام طلبك بنجاح. سيتم مراجعة الدفع وإرسال المنتج على واتساب بعد التأكيد.',
+        form_timestamp: data.form_timestamp
+      });
+    } catch (e) {
+      const code = e.code === 'VALIDATION' ? 422 : e.code === 'DUPLICATE' ? 409 : 500;
+      sendJson(res, code, { ok: false, error: e.message, details: e.details });
+    }
     return;
   }
 

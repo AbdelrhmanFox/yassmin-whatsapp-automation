@@ -1,4 +1,6 @@
-const { getSupabase, usePaymentsEdge, PAYMENTS_FUNCTION_URL, SCHEMA } = require('./supabase');
+const { getSupabase, usePaymentsEdge, PAYMENTS_FUNCTION_URL, DASHBOARD_FUNCTION_URL, SCHEMA } =
+  require('./supabase');
+const { buildPaymentPayload } = require('./create-payment');
 
 async function edgeFetch(path, options = {}) {
   const anon = process.env.SUPABASE_ANON_KEY || '';
@@ -176,9 +178,81 @@ async function updatePaymentDone(formTimestamp, done, options = {}) {
   return listPayments();
 }
 
+async function listProducts() {
+  if (usePaymentsEdge() && DASHBOARD_FUNCTION_URL) {
+    const anon = process.env.SUPABASE_ANON_KEY || '';
+    const url = `${DASHBOARD_FUNCTION_URL.replace(/\/$/, '')}/products`;
+    const res = await fetch(url, {
+      headers: { apikey: anon, Authorization: `Bearer ${anon}` }
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || 'products_fetch_failed');
+    return data.products || [];
+  }
+  const supabase = getSupabase();
+  const { data, error } = await supabase
+    .from('product_pdf_map')
+    .select('product_code, label_ar, pdf_url')
+    .order('label_ar');
+  if (error) throw error;
+  return data || [];
+}
+
+async function createPayment(body) {
+  const payload = buildPaymentPayload(body);
+
+  if (usePaymentsEdge() && DASHBOARD_FUNCTION_URL) {
+    const anon = process.env.SUPABASE_ANON_KEY || '';
+    const url = `${DASHBOARD_FUNCTION_URL.replace(/\/$/, '')}/ingest/payment`;
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: {
+        apikey: anon,
+        Authorization: `Bearer ${anon}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      const err = new Error(data.error || 'payment_insert_failed');
+      err.code = data.code || 'INSERT';
+      throw err;
+    }
+    return { ok: true, form_timestamp: payload.form_timestamp, ...data };
+  }
+
+  const supabase = getSupabase();
+  const row = {
+    form_timestamp: payload.form_timestamp,
+    name: payload.name,
+    email: payload.email,
+    phone: payload.phone,
+    product_code: payload.product_code,
+    product_label: payload.product_label,
+    payment_method: payload.payment_method,
+    done: false,
+    raw: payload.raw
+  };
+
+  const { error } = await supabase.from('payments').insert(row);
+  if (error) {
+    if (error.code === '23505') {
+      const err = new Error('duplicate_submission');
+      err.code = 'DUPLICATE';
+      throw err;
+    }
+    throw error;
+  }
+
+  return { ok: true, form_timestamp: payload.form_timestamp };
+}
+
 module.exports = {
   listPayments,
   updatePaymentDone,
+  createPayment,
+  listProducts,
   readPayments,
   summarize,
   MATCH_COL

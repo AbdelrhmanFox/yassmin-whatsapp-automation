@@ -87,6 +87,31 @@ Deno.serve(async (req) => {
         return json(200, { ok: true });
       }
 
+      if (path === "/ingest/payment") {
+        const body = await req.json().catch(() => ({}));
+        const phone = normPhone(body.phone);
+        if (!phone || !norm(body.name) || !norm(body.email) || !norm(body.product_code)) {
+          return json(400, { ok: false, error: "validation_failed" });
+        }
+        const row = {
+          form_timestamp: norm(body.form_timestamp) || new Date().toLocaleString("ar-EG"),
+          name: norm(body.name),
+          email: norm(body.email).toLowerCase(),
+          phone,
+          product_code: norm(body.product_code),
+          product_label: norm(body.product_label) || null,
+          payment_method: norm(body.payment_method) || null,
+          done: false,
+          raw: body.raw && typeof body.raw === "object" ? body.raw : {}
+        };
+        const { error } = await db.from("payments").insert(row);
+        if (error) {
+          if (error.code === "23505") return json(409, { ok: false, error: "duplicate_submission" });
+          throw error;
+        }
+        return json(200, { ok: true, form_timestamp: row.form_timestamp });
+      }
+
       if (path === "/ingest/paused-chat") {
         const phone = normPhone(body.phone);
         if (!phone) return json(400, { ok: false, error: "invalid_phone" });
@@ -115,6 +140,15 @@ Deno.serve(async (req) => {
         }
         return json(200, { ok: true });
       }
+    }
+
+    if (req.method === "GET" && path === "/products") {
+      const { data, error } = await db
+        .from("product_pdf_map")
+        .select("product_code, label_ar, pdf_url")
+        .order("label_ar");
+      if (error) throw error;
+      return json(200, { ok: true, products: data || [] });
     }
 
     if (req.method === "GET" && path === "/paused-chats") {
