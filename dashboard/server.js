@@ -14,6 +14,7 @@ const {
 const { sendPaymentWhatsAppNow } = require('./lib/send-payment-whatsapp');
 const {
   listThreads,
+  listPausedChats,
   setRoutingMode,
   ingestMessage,
   ingestPausedChat,
@@ -405,6 +406,20 @@ const server = http.createServer(async (req, res) => {
       const q = url.searchParams.get('q') || '';
       const status = url.searchParams.get('status') || 'all';
       const data = await listThreads({ q, status });
+      sendJson(res, 200, data);
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: error.message });
+    }
+    return;
+  }
+
+  if (req.method === 'GET' && url.pathname === '/api/paused-chats') {
+    if (!isAuthorized(req)) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      return;
+    }
+    try {
+      const data = await listPausedChats();
       sendJson(res, 200, data);
     } catch (error) {
       sendJson(res, 500, { ok: false, error: error.message });

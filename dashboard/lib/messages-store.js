@@ -365,8 +365,25 @@ async function listThreadMessages(phone) {
   return { ok: true, phone: p, messages: data || [] };
 }
 
+async function listPausedChats() {
+  if (useMessagesEdge()) {
+    return edgeFetch('/paused-chats');
+  }
+  const supabase = await getDb();
+  const now = new Date().toISOString();
+  const { data, error } = await supabase
+    .from('paused_chats')
+    .select('phone, paused_at, last_human_at, expires_at, reason, active')
+    .eq('active', true)
+    .gt('expires_at', now)
+    .order('expires_at', { ascending: true });
+  if (error) throw error;
+  return { ok: true, rows: data || [] };
+}
+
 module.exports = {
   listThreads,
+  listPausedChats,
   setRoutingMode,
   ingestMessage,
   ingestPausedChat,

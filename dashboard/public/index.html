@@ -119,6 +119,29 @@
             </p>
           </div>
 
+          <div class="card table-card" style="margin-bottom: 16px; border-color: #fcd34d44">
+            <h3 class="table-card-title">أرقام موقوفة للرد البشري (تمنع إرسال تأكيد الدفع)</h3>
+            <p class="muted small" style="margin: 0 0 10px 0">
+              المصدر: جدول <code>paused_chats</code> — نفس ما يفحصه «إرسال الدفع الآن». الإيقاف عادةً ٢٤ ساعة بعد ردّك من واتساب الأعمال أو «تحويل لرد بشري».
+            </p>
+            <div class="table-wrap">
+              <table class="data-table data-table--compact">
+                <thead>
+                  <tr>
+                    <th>الرقم</th>
+                    <th>آخر رد بشري</th>
+                    <th>ينتهي الإيقاف</th>
+                    <th>السبب</th>
+                    <th>إجراء</th>
+                  </tr>
+                </thead>
+                <tbody id="pausedChatsBody">
+                  <tr><td colspan="5" class="empty">جاري التحميل…</td></tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
           <div class="toolbar card">
             <input id="msgSearchQ" type="search" placeholder="بحث برقم الواتساب أو نص الرسالة…" />
             <select id="msgFilterStatus">

@@ -19,6 +19,7 @@ const msgSearchQInput = document.getElementById('msgSearchQ');
 const msgFilterStatusInput = document.getElementById('msgFilterStatus');
 const messagesBody = document.getElementById('messagesBody');
 const recentMessagesBody = document.getElementById('recentMessagesBody');
+const pausedChatsBody = document.getElementById('pausedChatsBody');
 const threadPanel = document.getElementById('threadPanel');
 const threadPhoneEl = document.getElementById('threadPhone');
 const threadBubblesEl = document.getElementById('threadBubbles');
@@ -494,8 +495,57 @@ function renderMessageThreadBubbles(messages) {
   threadBubblesEl.innerHTML = parts.length ? parts.join('') : '<p class="empty muted">لا نصوص مسجّلة</p>';
 }
 
+const PAUSED_REASON_LABELS = {
+  human_handoff: 'رد من واتساب الأعمال',
+  human_reply: 'رد بشري',
+  dashboard_manual: 'من اللوحة يدوياً'
+};
+
+function renderPausedChats(rows) {
+  if (!pausedChatsBody) return;
+  if (!rows.length) {
+    pausedChatsBody.innerHTML =
+      '<tr><td colspan="5" class="empty">لا أرقام موقوفة حالياً — يمكن إرسال تأكيد الدفع لأي رقم غير مدرج هنا.</td></tr>';
+    return;
+  }
+  pausedChatsBody.innerHTML = rows
+    .map((row) => {
+      const phone = escapeHtml(row.phone || '');
+      const reasonKey = String(row.reason || '').trim();
+      const reason =
+        PAUSED_REASON_LABELS[reasonKey] || (reasonKey ? escapeHtml(reasonKey) : '—');
+      return `<tr>
+        <td class="mono">${phone}</td>
+        <td class="mono small">${escapeHtml(formatWhen(row.last_human_at || row.paused_at))}</td>
+        <td class="mono small">${escapeHtml(formatWhen(row.expires_at))}</td>
+        <td class="small muted">${reason}</td>
+        <td><button type="button" class="btn-sm btn-ok" data-action="auto" data-phone="${phone}">تفعيل الرد التلقائي</button></td>
+      </tr>`;
+    })
+    .join('');
+  pausedChatsBody.querySelectorAll('button[data-action]').forEach((btn) => {
+    btn.addEventListener('click', () => onRoutingAction(btn));
+  });
+}
+
+async function loadPausedChats() {
+  if (!pausedChatsBody) return;
+  pausedChatsBody.innerHTML = '<tr><td colspan="5" class="empty">جاري التحميل…</td></tr>';
+  try {
+    const res = await fetch('/api/paused-chats', { headers: apiHeaders() });
+    const data = await res.json();
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || 'فشل تحميل الأرقام الموقوفة');
+    }
+    renderPausedChats(data.rows || []);
+  } catch (e) {
+    pausedChatsBody.innerHTML = `<tr><td colspan="5" class="empty error">${escapeHtml(e.message)}</td></tr>`;
+  }
+}
+
 async function loadMessages() {
   messagesBody.innerHTML = '<tr><td colspan="6" class="empty">جاري التحميل…</td></tr>';
+  loadPausedChats();
   try {
     const data = await fetchMessages();
     const provider = data.provider || 'supabase';
@@ -526,6 +576,7 @@ async function onRoutingAction(btn) {
       throw new Error(data.error || 'فشل التحديث');
     }
     showToast(data.message || (mode === 'human' ? 'تم التحويل للرد البشري' : 'تم تفعيل الرد التلقائي'));
+    await loadPausedChats();
     if (data.stats && data.threads) {
       renderMsgStats(data.stats);
       renderMessagesTable(data.threads);
