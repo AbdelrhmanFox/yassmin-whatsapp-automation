@@ -47,6 +47,21 @@ function normPhone(s) {
   return d;
 }
 
+/** لا تُعرض في اللوحة: فلتر ويب هوك أو أرقام غير صالحة. */
+function isNoiseLogRow(row) {
+  const st = String(row?.status ?? '');
+  if (st === 'inbound_filtered') return true;
+  const phone = normPhone(row?.phone);
+  if (!phone || phone === '209999999999') return true;
+  if (!/^20\d{10}$/.test(phone)) return true;
+  return false;
+}
+
+function isValidDashboardPhone(phone) {
+  const p = normPhone(phone);
+  return Boolean(p && p !== '209999999999' && /^20\d{10}$/.test(p));
+}
+
 function deriveThreadStatus(thread) {
   const until = thread.human_handoff_until ? new Date(thread.human_handoff_until).getTime() : 0;
   const humanActive =
@@ -92,6 +107,7 @@ function buildThreadsFromMessageLog(logRows) {
   );
   const byPhone = new Map();
   for (const row of sorted) {
+    if (isNoiseLogRow(row)) continue;
     const phone = normPhone(row.phone);
     if (!phone) continue;
     if (!byPhone.has(phone)) {
@@ -146,7 +162,7 @@ async function listThreads(filters = {}) {
     .order('last_message_at', { ascending: false });
   if (error) throw error;
 
-  let rows = (threads || []).map(mapThread);
+  let rows = (threads || []).map(mapThread).filter((r) => isValidDashboardPhone(r.phone));
   if (!(threads || []).length) {
     const { data: logForThreads, error: logErr } = await supabase
       .from('message_log')
@@ -179,11 +195,12 @@ async function listThreads(filters = {}) {
     received: rows.filter((r) => r.status === 'received').length
   };
 
-  const { data: recent } = await supabase
+  const { data: recentRaw } = await supabase
     .from('message_log')
     .select('*')
     .order('logged_at', { ascending: false })
-    .limit(120);
+    .limit(200);
+  const recent = (recentRaw || []).filter((r) => !isNoiseLogRow(r)).slice(0, 120);
 
   return {
     ok: true,
@@ -191,7 +208,7 @@ async function listThreads(filters = {}) {
     stats,
     count: rows.length,
     threads: rows,
-    recent_messages: recent || []
+    recent_messages: recent
   };
 }
 

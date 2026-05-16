@@ -79,6 +79,16 @@ async function uploadReceipt(
   return data.publicUrl;
 }
 
+/** لا تُعرض في لوحة الرسائل: فلتر ويب هوك، أرقام وهمية، أو صيغة غير صالحة. */
+function isNoiseLogRow(row: Record<string, unknown>) {
+  const st = String(row.status ?? "");
+  if (st === "inbound_filtered") return true;
+  const phone = normPhone(row.phone);
+  if (!phone || phone === "209999999999") return true;
+  if (!/^20\d{10}$/.test(phone)) return true;
+  return false;
+}
+
 function deriveThreadStatus(thread: Record<string, unknown>) {
   const until = thread.human_handoff_until ? new Date(String(thread.human_handoff_until)).getTime() : 0;
   const humanActive = thread.routing_mode === "human" && (!until || until > Date.now());
@@ -99,6 +109,7 @@ function threadsFromMessageLog(logs: Record<string, unknown>[]) {
   );
   const byPhone = new Map<string, Record<string, unknown>>();
   for (const row of sorted) {
+    if (isNoiseLogRow(row)) continue;
     const phone = normPhone(row.phone);
     if (!phone) continue;
     if (!byPhone.has(phone)) {
@@ -211,6 +222,9 @@ Deno.serve(async (req) => {
       if (path === "/ingest/message") {
         const phone = normPhone(body.phone);
         if (!phone) return json(400, { ok: false, error: "invalid_phone" });
+        if (body.status === "inbound_filtered" || isNoiseLogRow({ phone, status: body.status })) {
+          return json(200, { ok: true, skipped: "noise_log" });
+        }
         const { error } = await db.from("message_log").insert({
           phone,
           message: body.message ?? null,
@@ -392,6 +406,10 @@ Deno.serve(async (req) => {
         };
       };
       let rows = (threads || []).map((r) => mapThreadRow(r as Record<string, unknown>));
+      rows = rows.filter((r) => {
+        const p = normPhone(r.phone);
+        return Boolean(p && p !== "209999999999" && /^20\d{10}$/.test(p));
+      });
       if (!threads || threads.length === 0) {
         const { data: logForThreads, error: logErr } = await db
           .from("message_log")
@@ -413,7 +431,12 @@ Deno.serve(async (req) => {
             .includes(q)
         );
       }
-      const { data: recent } = await db.from("message_log").select("*").order("logged_at", { ascending: false }).limit(120);
+      const { data: recentRaw } = await db
+        .from("message_log")
+        .select("*")
+        .order("logged_at", { ascending: false })
+        .limit(200);
+      const recent = (recentRaw || []).filter((r) => !isNoiseLogRow(r as Record<string, unknown>)).slice(0, 120);
       return json(200, {
         ok: true,
         provider: "supabase-edge",
@@ -439,7 +462,8 @@ Deno.serve(async (req) => {
         .order("logged_at", { ascending: true })
         .limit(200);
       if (error) throw error;
-      return json(200, { ok: true, phone, messages: data || [] });
+      const messages = (data || []).filter((r) => !isNoiseLogRow(r as Record<string, unknown>));
+      return json(200, { ok: true, phone, messages });
     }
 
     const routingMatch = path.match(/^\/chats\/([^/]+)\/routing$/);
