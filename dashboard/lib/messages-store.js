@@ -1,4 +1,4 @@
-const { getSupabase, DASHBOARD_FUNCTION_URL } = require('./supabase');
+const { getSupabase, DASHBOARD_FUNCTION_URL, useKeywordsEdge } = require('./supabase');
 
 const SUPABASE_ANON_KEY = process.env.SUPABASE_ANON_KEY || '';
 
@@ -27,8 +27,9 @@ async function edgeFetch(path, options = {}) {
   return data;
 }
 
+/** نفس منطق الدفعات/الكلمات: RLS على yassmin.* يمنع anon — القراءة عبر Edge بـ service_role داخل Supabase. */
 function useMessagesEdge() {
-  return Boolean(DASHBOARD_FUNCTION_URL && SUPABASE_ANON_KEY && !process.env.SUPABASE_SERVICE_ROLE_KEY);
+  return useKeywordsEdge();
 }
 
 async function getDb() {
