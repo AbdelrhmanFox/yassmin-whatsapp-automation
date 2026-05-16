@@ -32,6 +32,17 @@ const refreshPaymentsBtn = document.getElementById('refreshPayments');
 const refreshMessagesBtn = document.getElementById('refreshMessages');
 const keywordsBody = document.getElementById('keywordsBody');
 const refreshKeywordsBtn = document.getElementById('refreshKeywords');
+const botSettingsForm = document.getElementById('botSettingsForm');
+const reloadBotSettingsBtn = document.getElementById('reloadBotSettings');
+const settingsUpdatedAtEl = document.getElementById('settingsUpdatedAt');
+const setUserCooldown = document.getElementById('setUserCooldown');
+const setDuplicateWindow = document.getElementById('setDuplicateWindow');
+const setUserBurst = document.getElementById('setUserBurst');
+const setGlobalPerMinute = document.getElementById('setGlobalPerMinute');
+const setDailyLimit = document.getElementById('setDailyLimit');
+const setMessageMaxAge = document.getElementById('setMessageMaxAge');
+const setHandoffHours = document.getElementById('setHandoffHours');
+const setLogDedup = document.getElementById('setLogDedup');
 const kwNewOrder = document.getElementById('kwNewOrder');
 const kwNewActive = document.getElementById('kwNewActive');
 const kwNewTrigger = document.getElementById('kwNewTrigger');
@@ -793,6 +804,67 @@ async function onAddKeyword() {
   }
 }
 
+function fillBotSettingsForm(settings) {
+  if (!settings) return;
+  if (setUserCooldown) setUserCooldown.value = settings.user_cooldown_seconds;
+  if (setDuplicateWindow) setDuplicateWindow.value = settings.duplicate_window_seconds;
+  if (setUserBurst) setUserBurst.value = settings.user_burst_per_minute;
+  if (setGlobalPerMinute) setGlobalPerMinute.value = settings.global_per_minute_limit;
+  if (setDailyLimit) setDailyLimit.value = settings.daily_message_limit;
+  if (setMessageMaxAge) setMessageMaxAge.value = settings.message_max_age_seconds;
+  if (setHandoffHours) setHandoffHours.value = settings.human_handoff_hours;
+  if (setLogDedup) setLogDedup.checked = settings.log_dedup_blocked !== false;
+  if (settingsUpdatedAtEl && settings.updated_at) {
+    settingsUpdatedAtEl.textContent = `آخر تحديث: ${formatWhen(settings.updated_at)}`;
+  }
+}
+
+function collectBotSettingsForm() {
+  return {
+    user_cooldown_seconds: Number(setUserCooldown?.value),
+    duplicate_window_seconds: Number(setDuplicateWindow?.value),
+    user_burst_per_minute: Number(setUserBurst?.value),
+    global_per_minute_limit: Number(setGlobalPerMinute?.value),
+    daily_message_limit: Number(setDailyLimit?.value),
+    message_max_age_seconds: Number(setMessageMaxAge?.value),
+    human_handoff_hours: Number(setHandoffHours?.value),
+    log_dedup_blocked: setLogDedup?.checked !== false
+  };
+}
+
+async function loadBotSettings() {
+  if (!botSettingsForm) return;
+  try {
+    const res = await fetch('/api/bot-settings', { headers: apiHeaders() });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'فشل تحميل الإعدادات');
+    fillBotSettingsForm(data.settings);
+  } catch (e) {
+    showToast(e.message, 'err');
+  }
+}
+
+async function saveBotSettings(ev) {
+  ev?.preventDefault();
+  const btn = document.getElementById('saveBotSettings');
+  if (btn) btn.disabled = true;
+  try {
+    const res = await fetch('/api/bot-settings', {
+      method: 'PATCH',
+      headers: apiHeaders(),
+      body: JSON.stringify(collectBotSettingsForm())
+    });
+    const data = await res.json();
+    if (!res.ok || !data.ok) throw new Error(data.error || 'فشل الحفظ');
+    fillBotSettingsForm(data.settings);
+    showToast('تم حفظ إعدادات البوت');
+  } catch (e) {
+    showToast(e.message, 'err');
+  } finally {
+    if (btn) btn.disabled = false;
+  }
+}
+
 function setView(view) {
   if (view !== 'keywords') closeKeywordModal();
   document.querySelectorAll('.nav-item').forEach((b) => b.classList.remove('active'));
@@ -804,6 +876,7 @@ function setView(view) {
     payments: 'عمليات الدفع',
     messages: 'رسائل واتساب',
     keywords: 'ردود البوت (كلمات مفتاحية)',
+    settings: 'إعدادات البوت',
     operations: 'تحكم الأتمتة'
   };
   document.getElementById('viewTitle').textContent = titles[view] || 'Yassmin Ops';
@@ -817,6 +890,7 @@ function setView(view) {
   if (view === 'payments') loadPayments();
   if (view === 'messages') loadMessages();
   if (view === 'keywords') loadKeywords();
+  if (view === 'settings') loadBotSettings();
 }
 
 function startAutoRefresh() {
@@ -835,6 +909,8 @@ document.querySelectorAll('.nav-item').forEach((btn) => {
 document.getElementById('refreshPayments').addEventListener('click', loadPayments);
 refreshMessagesBtn?.addEventListener('click', loadMessages);
 refreshKeywordsBtn?.addEventListener('click', loadKeywords);
+botSettingsForm?.addEventListener('submit', saveBotSettings);
+reloadBotSettingsBtn?.addEventListener('click', loadBotSettings);
 kwAddBtn?.addEventListener('click', onAddKeyword);
 kwEditModal?.addEventListener('click', (e) => {
   if (e.target === kwEditModal) closeKeywordModal();

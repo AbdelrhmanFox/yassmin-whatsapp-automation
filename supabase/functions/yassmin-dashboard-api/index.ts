@@ -102,6 +102,50 @@ function deriveThreadStatus(thread: Record<string, unknown>) {
   return "received";
 }
 
+const BOT_SETTINGS_DEFAULTS = {
+  user_cooldown_seconds: 40,
+  duplicate_window_seconds: 120,
+  user_burst_per_minute: 2,
+  global_per_minute_limit: 45,
+  daily_message_limit: 300,
+  message_max_age_seconds: 300,
+  human_handoff_hours: 24,
+  log_dedup_blocked: true
+};
+
+function clampInt(v: unknown, min: number, max: number, fallback: number) {
+  const n = Number(v);
+  if (!Number.isFinite(n)) return fallback;
+  return Math.min(max, Math.max(min, Math.floor(n)));
+}
+
+function normalizeBotSettings(row: Record<string, unknown> | null | undefined) {
+  const s = { ...BOT_SETTINGS_DEFAULTS, ...(row || {}) };
+  return {
+    id: "default",
+    user_cooldown_seconds: clampInt(s.user_cooldown_seconds, 0, 600, 40),
+    duplicate_window_seconds: clampInt(s.duplicate_window_seconds, 0, 3600, 120),
+    user_burst_per_minute: clampInt(s.user_burst_per_minute, 1, 30, 2),
+    global_per_minute_limit: clampInt(s.global_per_minute_limit, 1, 200, 45),
+    daily_message_limit: clampInt(s.daily_message_limit, 10, 5000, 300),
+    message_max_age_seconds: clampInt(s.message_max_age_seconds, 30, 86400, 300),
+    human_handoff_hours: clampInt(s.human_handoff_hours, 1, 168, 24),
+    log_dedup_blocked: s.log_dedup_blocked !== false,
+    updated_at: String(s.updated_at || new Date().toISOString())
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function loadBotSettings(db: any) {
+  const { data } = await db.from("bot_settings").select("*").eq("id", "default").maybeSingle();
+  if (!data) {
+    const row = normalizeBotSettings(BOT_SETTINGS_DEFAULTS as unknown as Record<string, unknown>);
+    await db.from("bot_settings").upsert(row, { onConflict: "id" });
+    return row;
+  }
+  return normalizeBotSettings(data as Record<string, unknown>);
+}
+
 function threadsFromMessageLog(logs: Record<string, unknown>[]) {
   if (!logs.length) return [];
   const sorted = [...logs].sort(
@@ -298,6 +342,21 @@ Deno.serve(async (req) => {
       return json(200, { ok: true, rows: data || [] });
     }
 
+    if (req.method === "GET" && path === "/bot-settings") {
+      const settings = await loadBotSettings(db);
+      return json(200, { ok: true, settings });
+    }
+
+    if (req.method === "PATCH" && path === "/bot-settings") {
+      if (!requireDashboardWrite(req)) return json(401, { ok: false, error: "unauthorized" });
+      const body = await req.json().catch(() => ({}));
+      const current = await loadBotSettings(db);
+      const next = normalizeBotSettings({ ...current, ...body, id: "default", updated_at: new Date().toISOString() });
+      const { data, error } = await db.from("bot_settings").upsert(next, { onConflict: "id" }).select("*").single();
+      if (error) throw error;
+      return json(200, { ok: true, settings: normalizeBotSettings(data as Record<string, unknown>) });
+    }
+
     /** n8n dedup: same shape as legacy Google Sheet log (timestamp, phone, message, message_id). */
     if (req.method === "GET" && path === "/message-log/recent") {
       if (!requireN8n(req)) return json(401, { ok: false, error: "unauthorized" });
@@ -436,7 +495,12 @@ Deno.serve(async (req) => {
         .select("*")
         .order("logged_at", { ascending: false })
         .limit(200);
-      const recent = (recentRaw || []).filter((r) => !isNoiseLogRow(r as Record<string, unknown>)).slice(0, 120);
+      const dashSettings = await loadBotSettings(db);
+      const hideDedup = dashSettings.log_dedup_blocked === false;
+      const recent = (recentRaw || [])
+        .filter((r) => !isNoiseLogRow(r as Record<string, unknown>))
+        .filter((r) => !(hideDedup && String((r as Record<string, unknown>).status) === "dedup_blocked")))
+        .slice(0, 120);
       return json(200, {
         ok: true,
         provider: "supabase-edge",

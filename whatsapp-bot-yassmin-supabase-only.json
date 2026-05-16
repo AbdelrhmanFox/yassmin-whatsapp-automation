@@ -20,6 +20,42 @@
     },
     {
       "parameters": {
+        "url": "https://elcofahsbznfalrbjmfo.supabase.co/functions/v1/yassmin-dashboard-api/bot-settings",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVsY29mYWhzYnpuZmFscmJqbWZvIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MzQ5MzcsImV4cCI6MjA5NDIxMDkzN30.WnPo_idoA-OmDexi-CiuYmeA9PH4LH0BvusrrIUUfgg"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            }
+          ]
+        },
+        "options": {
+          "timeout": 15000
+        }
+      },
+      "id": "b0t5e771-0001-4001-8001-000000000001",
+      "name": "HTTP: Read Bot Settings (DB)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        -53728,
+        2968
+      ],
+      "continueOnFail": true,
+      "notesInFlow": true,
+      "notes": "حدود الإرسال من تبويب الإعدادات في اللوحة."
+    },
+    {
+      "parameters": {
         "conditions": {
           "options": {
             "caseSensitive": true,
@@ -50,7 +86,7 @@
             {
               "id": "c3-recent",
               "leftValue": "={{ (() => { const d = ($json.body?.data ?? $json.body?.body?.data ?? $json.data) || {}; const t = Number(d.messageTimestamp); const sec = Number.isFinite(t) && t > 1e12 ? Math.floor(t / 1000) : t; if (!Number.isFinite(sec) || sec <= 0) return 9999; return (Date.now() / 1000) - sec; })() }}",
-              "rightValue": 300,
+              "rightValue": "={{ (() => { try { const n = Number($('HTTP: Read Bot Settings (DB)').first().json.settings?.message_max_age_seconds); return Number.isFinite(n) && n > 0 ? n : 300; } catch { return 300; } })() }}",
               "operator": {
                 "type": "number",
                 "operation": "lt"
@@ -303,7 +339,7 @@
     },
     {
       "parameters": {
-        "jsCode": "// Protection layer: deduplication + per-user cooldown + burst control + global rate limit\nconst allRows = $input.all().map(r => r.json).filter(r => r.timestamp);\nconst msgData = $('Code: Keyword Matcher').first().json;\n\nconst now = Date.now();\nconst today = new Date().toISOString().split('T')[0];\nconst phone = String(msgData.phone || '');\nconst message = String(msgData.message_text || '').trim().toLowerCase();\n\nconst DAILY_LIMIT = 300;\nconst GLOBAL_PER_MINUTE_LIMIT = 45;\nconst USER_COOLDOWN_SECONDS = 40;\nconst DUPLICATE_WINDOW_SECONDS = 120;\nconst USER_BURST_PER_MINUTE_LIMIT = 2;\n\nconst toMs = (ts) => {\n  const n = new Date(ts).getTime();\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst alreadyProcessed = allRows.some(r => r.message_id && r.message_id === msgData.message_id);\n\nconst sameUserRows = allRows.filter(r => String(r.phone || '') === phone);\n\nconst duplicateRecentText = sameUserRows.some(r => {\n  const sameText = String(r.message || '').trim().toLowerCase() === message;\n  if (!sameText) return false;\n  const ageSec = (now - toMs(r.timestamp)) / 1000;\n  return ageSec >= 0 && ageSec <= DUPLICATE_WINDOW_SECONDS;\n});\n\nconst lastUserEventAt = Math.max(0, ...sameUserRows.map(r => toMs(r.timestamp)));\nconst userCooldownActive = lastUserEventAt > 0 && ((now - lastUserEventAt) / 1000) < USER_COOLDOWN_SECONDS;\n\nconst userLastMinuteCount = sameUserRows.filter(r => {\n  const ageSec = (now - toMs(r.timestamp)) / 1000;\n  return ageSec >= 0 && ageSec <= 60;\n}).length;\nconst userBurstLimitReached = userLastMinuteCount >= USER_BURST_PER_MINUTE_LIMIT;\n\nconst todayCount = allRows.filter(r => r.timestamp && String(r.timestamp).startsWith(today)).length;\nconst limitReached = todayCount >= DAILY_LIMIT;\n\nconst lastMinuteCount = allRows.filter(r => {\n  const ageSec = (now - toMs(r.timestamp)) / 1000;\n  return ageSec >= 0 && ageSec <= 60;\n}).length;\nconst globalMinuteLimitReached = lastMinuteCount >= GLOBAL_PER_MINUTE_LIMIT;\n\nlet blockReason = '';\nif (alreadyProcessed) blockReason = 'duplicate_message_id';\nelse if (duplicateRecentText) blockReason = 'duplicate_text_window';\nelse if (userCooldownActive) blockReason = 'user_cooldown';\nelse if (userBurstLimitReached) blockReason = 'user_burst_limit';\nelse if (globalMinuteLimitReached) blockReason = 'global_rate_limit';\nelse if (limitReached) blockReason = 'daily_limit';\n\nreturn [{\n  json: {\n    ...msgData,\n    already_processed: alreadyProcessed,\n    duplicate_recent_text: duplicateRecentText,\n    user_cooldown_active: userCooldownActive,\n    user_burst_limit_reached: userBurstLimitReached,\n    user_last_minute_count: userLastMinuteCount,\n    global_minute_limit_reached: globalMinuteLimitReached,\n    today_count: todayCount,\n    limit_reached: limitReached,\n    block_reason: blockReason,\n    clear_to_send: blockReason === ''\n  }\n}];"
+        "jsCode": "// Protection layer: deduplication + per-user cooldown + burst control + global rate limit\nfunction botLimits() {\n  try {\n    const s = $('HTTP: Read Bot Settings (DB)').first().json.settings || {};\n    const n = (k, d) => { const v = Number(s[k]); return Number.isFinite(v) ? v : d; };\n    return {\n      DAILY_LIMIT: n('daily_message_limit', 300),\n      GLOBAL_PER_MINUTE_LIMIT: n('global_per_minute_limit', 45),\n      USER_COOLDOWN_SECONDS: n('user_cooldown_seconds', 40),\n      DUPLICATE_WINDOW_SECONDS: n('duplicate_window_seconds', 120),\n      USER_BURST_PER_MINUTE_LIMIT: n('user_burst_per_minute', 2),\n      log_dedup_blocked: s.log_dedup_blocked !== false\n    };\n  } catch {\n    return { DAILY_LIMIT: 300, GLOBAL_PER_MINUTE_LIMIT: 45, USER_COOLDOWN_SECONDS: 40, DUPLICATE_WINDOW_SECONDS: 120, USER_BURST_PER_MINUTE_LIMIT: 2, log_dedup_blocked: true };\n  }\n}\nconst L = botLimits();\nconst allRows = $input.all().map(r => r.json).filter(r => r.timestamp);\nconst msgData = $('Code: Keyword Matcher').first().json;\n\nconst now = Date.now();\nconst today = new Date().toISOString().split('T')[0];\nconst phone = String(msgData.phone || '');\nconst message = String(msgData.message_text || '').trim().toLowerCase();\n\nconst DAILY_LIMIT = L.DAILY_LIMIT;\nconst GLOBAL_PER_MINUTE_LIMIT = L.GLOBAL_PER_MINUTE_LIMIT;\nconst USER_COOLDOWN_SECONDS = L.USER_COOLDOWN_SECONDS;\nconst DUPLICATE_WINDOW_SECONDS = L.DUPLICATE_WINDOW_SECONDS;\nconst USER_BURST_PER_MINUTE_LIMIT = L.USER_BURST_PER_MINUTE_LIMIT;\n\nconst toMs = (ts) => {\n  const n = new Date(ts).getTime();\n  return Number.isFinite(n) ? n : 0;\n};\n\nconst alreadyProcessed = allRows.some(r => r.message_id && r.message_id === msgData.message_id);\n\nconst sameUserRows = allRows.filter(r => String(r.phone || '') === phone);\n\nconst duplicateRecentText = sameUserRows.some(r => {\n  const sameText = String(r.message || '').trim().toLowerCase() === message;\n  if (!sameText) return false;\n  const ageSec = (now - toMs(r.timestamp)) / 1000;\n  return ageSec >= 0 && ageSec <= DUPLICATE_WINDOW_SECONDS;\n});\n\nconst lastUserEventAt = Math.max(0, ...sameUserRows.map(r => toMs(r.timestamp)));\nconst userCooldownActive = lastUserEventAt > 0 && ((now - lastUserEventAt) / 1000) < USER_COOLDOWN_SECONDS;\n\nconst userLastMinuteCount = sameUserRows.filter(r => {\n  const ageSec = (now - toMs(r.timestamp)) / 1000;\n  return ageSec >= 0 && ageSec <= 60;\n}).length;\nconst userBurstLimitReached = userLastMinuteCount >= USER_BURST_PER_MINUTE_LIMIT;\n\nconst todayCount = allRows.filter(r => r.timestamp && String(r.timestamp).startsWith(today)).length;\nconst limitReached = todayCount >= DAILY_LIMIT;\n\nconst lastMinuteCount = allRows.filter(r => {\n  const ageSec = (now - toMs(r.timestamp)) / 1000;\n  return ageSec >= 0 && ageSec <= 60;\n}).length;\nconst globalMinuteLimitReached = lastMinuteCount >= GLOBAL_PER_MINUTE_LIMIT;\n\nlet blockReason = '';\nif (alreadyProcessed) blockReason = 'duplicate_message_id';\nelse if (duplicateRecentText) blockReason = 'duplicate_text_window';\nelse if (userCooldownActive) blockReason = 'user_cooldown';\nelse if (userBurstLimitReached) blockReason = 'user_burst_limit';\nelse if (globalMinuteLimitReached) blockReason = 'global_rate_limit';\nelse if (limitReached) blockReason = 'daily_limit';\n\nreturn [{\n  json: {\n    ...msgData,\n    already_processed: alreadyProcessed,\n    duplicate_recent_text: duplicateRecentText,\n    user_cooldown_active: userCooldownActive,\n    user_burst_limit_reached: userBurstLimitReached,\n    user_last_minute_count: userLastMinuteCount,\n    global_minute_limit_reached: globalMinuteLimitReached,\n    today_count: todayCount,\n    limit_reached: limitReached,\n    block_reason: blockReason,\n    clear_to_send: blockReason === '',\n    log_dedup_blocked: L.log_dedup_blocked\n  }\n}];"
       },
       "id": "0942240e-e88d-49cb-9c8f-44e0ad7e1358",
       "name": "Code: Dedup & Volume Check",
@@ -347,6 +383,39 @@
       "position": [
         -50784,
         2968
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "log-dedup-dash",
+              "leftValue": "={{ $json.log_dedup_blocked }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b0t5e771-0002-4002-8002-000000000002",
+      "name": "IF: Log Dedup In Dashboard?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [
+        -50672,
+        3064
       ]
     },
     {
@@ -679,7 +748,7 @@
     },
     {
       "parameters": {
-        "jsCode": "function normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  while (d.startsWith('0020') && d.length > 12) d = d.slice(2);\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nconst src = $('Set: Extract Outgoing Fields').first().json;\nconst phone = normalizePhone(src.phone);\nconst now = new Date();\nconst nowIso = now.toISOString();\nconst expiresIso = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();\n\nlet existingRows = [];\ntry {\n  const http = $('HTTP: Read Paused Chats Handoff (DB)').first().json;\n  if (Array.isArray(http.rows)) existingRows = http.rows;\n} catch {}\nif (!existingRows.length) {\n  try {\n    existingRows = $('Sheets: Read Paused Chats Handoff').all().map((i) => i.json);\n  } catch {}\n}\n\nconst existing = existingRows.find((r) => normalizePhone(r.phone) === phone);\n\nreturn [{\n  json: {\n    phone,\n    paused_at: existing?.paused_at || nowIso,\n    last_human_at: nowIso,\n    expires_at: expiresIso,\n    reason: 'human_handoff',\n    active: 'TRUE'\n  }\n}];"
+        "jsCode": "function normalizePhone(v) {\n  let d = String(v ?? '').replace(/\\D/g, '');\n  if (!d) return '';\n  while (d.startsWith('0020') && d.length > 12) d = d.slice(2);\n  if (d.startsWith('20') && d.length === 12) return d;\n  if (d.startsWith('0') && d.length === 11) return '20' + d.slice(1);\n  if (!d.startsWith('20') && d.length === 10) return '20' + d;\n  return d;\n}\n\nconst src = $('Set: Extract Outgoing Fields').first().json;\nconst phone = normalizePhone(src.phone);\nconst now = new Date();\nconst nowIso = now.toISOString();\nlet handoffHours = 24;\ntry {\n  const h = Number($('HTTP: Read Bot Settings (DB)').first().json.settings?.human_handoff_hours);\n  if (Number.isFinite(h) && h > 0) handoffHours = h;\n} catch {}\nconst expiresIso = new Date(now.getTime() + handoffHours * 60 * 60 * 1000).toISOString();\n\nlet existingRows = [];\ntry {\n  const http = $('HTTP: Read Paused Chats Handoff (DB)').first().json;\n  if (Array.isArray(http.rows)) existingRows = http.rows;\n} catch {}\nif (!existingRows.length) {\n  try {\n    existingRows = $('Sheets: Read Paused Chats Handoff').all().map((i) => i.json);\n  } catch {}\n}\n\nconst existing = existingRows.find((r) => normalizePhone(r.phone) === phone);\n\nreturn [{\n  json: {\n    phone,\n    paused_at: existing?.paused_at || nowIso,\n    last_human_at: nowIso,\n    expires_at: expiresIso,\n    reason: 'human_handoff',\n    active: 'TRUE'\n  }\n}];"
       },
       "id": "b6cbaa59-99ea-45ca-9e54-8cbae38d05c4",
       "name": "Code: Build Pause Row",
@@ -1202,6 +1271,17 @@
       "main": [
         [
           {
+            "node": "HTTP: Read Bot Settings (DB)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP: Read Bot Settings (DB)": {
+      "main": [
+        [
+          {
             "node": "IF: Valid Message?",
             "type": "main",
             "index": 0
@@ -1349,7 +1429,25 @@
         ],
         [
           {
+            "node": "IF: Log Dedup In Dashboard?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "IF: Log Dedup In Dashboard?": {
+      "main": [
+        [
+          {
             "node": "HTTP: DB Ingest Message (Dedup Blocked)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "No Op: Blocked",
             "type": "main",
             "index": 0
           }

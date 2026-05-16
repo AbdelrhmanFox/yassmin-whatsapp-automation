@@ -20,6 +20,7 @@
           <button type="button" class="nav-item active" data-view="payments">عمليات الدفع</button>
           <button type="button" class="nav-item" data-view="messages">الرسائل</button>
           <button type="button" class="nav-item" data-view="keywords">ردود البوت</button>
+          <button type="button" class="nav-item" data-view="settings">إعدادات البوت</button>
           <button type="button" class="nav-item" data-view="operations">تحكم الأتمتة</button>
         </nav>
         <div class="sidebar-foot">
@@ -256,6 +257,58 @@
               </label>
               <button type="button" id="kwAddBtn" class="btn-primary">إضافة</button>
             </div>
+          </div>
+        </section>
+
+        <section id="view-settings" class="view hidden">
+          <p class="view-hint">
+            تُحفظ في <code>yassmin.bot_settings</code> وتُقرأ من workflow البوت عند كل رسالة. التغيير يطبّق على الرسائل
+            <strong>الجديدة</strong> بعد الحفظ (أعدي تفعيل workflow في n8n إن لزم).
+          </p>
+          <div class="card settings-form-card">
+            <form id="botSettingsForm" class="settings-form">
+              <div class="settings-grid">
+                <label class="settings-field">
+                  <span>الحد الأدنى بين ردّين لنفس العميل (ثانية)</span>
+                  <input id="setUserCooldown" type="number" min="0" max="600" step="1" required />
+                  <small class="muted">مثال: 40 = لا يرد قبل 40 ثانية بعد آخر تفاعل مع نفس الرقم</small>
+                </label>
+                <label class="settings-field">
+                  <span>نافذة منع تكرار نفس النص (ثانية)</span>
+                  <input id="setDuplicateWindow" type="number" min="0" max="3600" step="1" required />
+                </label>
+                <label class="settings-field">
+                  <span>أقصى رسائل لنفس العميل في الدقيقة</span>
+                  <input id="setUserBurst" type="number" min="1" max="30" step="1" required />
+                </label>
+                <label class="settings-field">
+                  <span>أقصى رسائل للبوت في الدقيقة (كل العملاء)</span>
+                  <input id="setGlobalPerMinute" type="number" min="1" max="200" step="1" required />
+                </label>
+                <label class="settings-field">
+                  <span>الحد اليومي للبوت (كل العملاء)</span>
+                  <input id="setDailyLimit" type="number" min="10" max="5000" step="1" required />
+                </label>
+                <label class="settings-field">
+                  <span>أقصى عمر حدث واتساب يُقبل (ثانية)</span>
+                  <input id="setMessageMaxAge" type="number" min="30" max="86400" step="1" required />
+                  <small class="muted">أحداث أقدم من ذلك تُتجاهل (فلتر الويب هوك)</small>
+                </label>
+                <label class="settings-field">
+                  <span>مدة إيقاف الرد التلقائي بعد ردّك أنت (ساعات)</span>
+                  <input id="setHandoffHours" type="number" min="1" max="168" step="1" required />
+                </label>
+                <label class="settings-field settings-field--check">
+                  <input id="setLogDedup" type="checkbox" />
+                  <span>إظهار صفوف «لم يُرسل (مكافح السبام)» في سجل الرسائل</span>
+                </label>
+              </div>
+              <div class="settings-actions">
+                <button type="submit" id="saveBotSettings" class="btn-primary">حفظ الإعدادات</button>
+                <button type="button" id="reloadBotSettings" class="secondary">إعادة تحميل</button>
+                <span id="settingsUpdatedAt" class="muted small"></span>
+              </div>
+            </form>
           </div>
         </section>
 

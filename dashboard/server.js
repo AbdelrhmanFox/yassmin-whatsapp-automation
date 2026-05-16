@@ -20,6 +20,7 @@ const {
   ingestPausedChat,
   listThreadMessages
 } = require('./lib/messages-store');
+const { getBotSettings, updateBotSettings } = require('./lib/bot-settings-store');
 const {
   listKeywords,
   createKeyword,
@@ -424,6 +425,29 @@ const server = http.createServer(async (req, res) => {
     } catch (error) {
       sendJson(res, 500, { ok: false, error: error.message });
     }
+    return;
+  }
+
+  if (url.pathname === '/api/bot-settings') {
+    if (!isAuthorized(req)) {
+      sendJson(res, 401, { ok: false, error: 'unauthorized' });
+      return;
+    }
+    try {
+      if (req.method === 'GET') {
+        sendJson(res, 200, await getBotSettings());
+        return;
+      }
+      if (req.method === 'PATCH') {
+        const body = await readBody(req);
+        sendJson(res, 200, await updateBotSettings(body));
+        return;
+      }
+    } catch (error) {
+      sendJson(res, 500, { ok: false, error: error.message });
+      return;
+    }
+    sendJson(res, 405, { ok: false, error: 'method_not_allowed' });
     return;
   }
 

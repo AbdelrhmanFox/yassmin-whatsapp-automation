@@ -200,7 +200,15 @@ async function listThreads(filters = {}) {
     .select('*')
     .order('logged_at', { ascending: false })
     .limit(200);
-  const recent = (recentRaw || []).filter((r) => !isNoiseLogRow(r)).slice(0, 120);
+  let hideDedup = false;
+  try {
+    const { getBotSettings } = require('./bot-settings-store');
+    hideDedup = (await getBotSettings()).settings?.log_dedup_blocked === false;
+  } catch {}
+  const recent = (recentRaw || [])
+    .filter((r) => !isNoiseLogRow(r))
+    .filter((r) => !(hideDedup && r.status === 'dedup_blocked'))
+    .slice(0, 120);
 
   return {
     ok: true,
