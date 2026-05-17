@@ -17,3 +17,17 @@ mcp-payload.json
 deploy-edge-args.json
 _deploy-dash.json
 deploy-fn.json
+_deploy_*.json
+_mcp*.json
+_invoke_mcp.json
+_meta_call_mcp.json
+_deploy*.json
+deploy-mcp-args.json
+deploy-body.json
+.cursor-edge-deploy.json
+invoke-deploy-mcp.cjs
+patch-deploy-json.js
+_peek-dedup.js
+_full_args_json_line.txt
+_term_payload_check.txt
+supabase/.temp/

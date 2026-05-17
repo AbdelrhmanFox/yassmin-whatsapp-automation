@@ -6,7 +6,7 @@
   "outputDirectory": "public",
   "framework": null,
   "functions": {
-    "api/**/*.js": {
+    "api/[...path].js": {
       "maxDuration": 30
     }
   },

@@ -499,7 +499,7 @@ Deno.serve(async (req) => {
       const hideDedup = dashSettings.log_dedup_blocked === false;
       const recent = (recentRaw || [])
         .filter((r) => !isNoiseLogRow(r as Record<string, unknown>))
-        .filter((r) => !(hideDedup && String((r as Record<string, unknown>).status) === "dedup_blocked")))
+        .filter((r) => !(hideDedup && String((r as Record<string, unknown>).status) === "dedup_blocked"))
         .slice(0, 120);
       return json(200, {
         ok: true,

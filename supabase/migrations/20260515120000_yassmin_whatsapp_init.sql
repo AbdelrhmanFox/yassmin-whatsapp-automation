@@ -119,7 +119,7 @@ CREATE TRIGGER keywords_updated_at
   FOR EACH ROW EXECUTE FUNCTION yassmin.set_updated_at();
 
 INSERT INTO yassmin.keywords (keyword, reply, active, sort_order) VALUES
-  ('hello, hi, مرحبا, أهلاً, أهلا, هاي, السلام', '👋 Hello! How can we help you today? Reply with *price*, *location*, or *hours*.', true, 1),
+  ('hello, hi, مرحبا, أهلاً, أهلا, هاي', '👋 Hello! How can we help you today? Reply with *price*, *location*, or *hours*.', true, 1),
   ('price, prices, سعر, الأسعار, بكام, كام', '💰 Our pricing:\n- Service A: $50\n- Service B: $80\nReply to book!', true, 2),
   ('location, address, عنوان, فين, وين', '📍 Address: 123 Main St\nGoogle Maps: https://maps.app.goo.gl/YOURLINK', true, 3),
   ('hours, working hours, مواعيد, ساعات, امتى', '🕐 Working hours: Sat–Thu, 9am–6pm. Fri: closed.', true, 4),

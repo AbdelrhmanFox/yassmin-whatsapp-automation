@@ -60,6 +60,15 @@
 5. **`IF: Clear to Send?` = لا** — Dedup: `user_cooldown` (40 ثانية)، نفس النص خلال دقيقتين، تكرار `message_id`، أو حدود المعدّل. راجعي **`block_reason`** في **`Code: Dedup & Volume Check`**.
 6. **`HTTP: Send Reply`** — تأكدت إن **`EVOLUTION_API_KEY`** والمثيل (`body.instance` من Webhook أو `EVOLUTION_INSTANCE`) صحيحان، والعنوان يطابق خادم Evolution لديكم.
 
+### ردّان: «default» الجديد + رسالة إنجليزية قديمة
+
+غالبًا السبب أحد الاثنين (أو الاثنان):
+
+1. **صف ترحيب (hello) ما زال مفعّلًا** وفيه كلمة **`السلام`** — أي رسالة فيها «السلام عليكم…» تطابق هذا الصف **قبل** `default`، فيُرسل الرد الإنجليزي القديم. الحل: من الداشبورد → **ردود البوت** — عطّلي صف الترحيب أو احذفي **`السلام`** من كلمات التشغيل (اتركي `default` فقط للأسئلة العامة).
+2. **تعديل الرسالة في واتساب** — قد يطلق Evolution ويب هوكًا ثانيًا. الوركفلو المحدَّث يتجاهل أحداث التعديل ويحدّ من أكثر من رد آلي في الدقيقة.
+
+بعد تحديث [`whatsapp-bot-yassmin-supabase-only.json`](whatsapp-bot-yassmin-supabase-only.json) أعيدي استيراده في n8n وفعّلي الوركفلو.
+
 ## Edge — مسارات جديدة لـ n8n
 
 في [`supabase/functions/yassmin-dashboard-api/index.ts`](supabase/functions/yassmin-dashboard-api/index.ts):
