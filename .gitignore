@@ -30,4 +30,6 @@ patch-deploy-json.js
 _peek-dedup.js
 _full_args_json_line.txt
 _term_payload_check.txt
+_node_roundtrip.json
+_ps_payload.json
 supabase/.temp/

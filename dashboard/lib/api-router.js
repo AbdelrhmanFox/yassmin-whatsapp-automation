@@ -56,8 +56,14 @@ function parseBody(req) {
 function resolvePathname(req) {
   const segs = req.query?.path;
   if (segs) {
-    const parts = Array.isArray(segs) ? segs : [segs];
-    return '/api/' + parts.map((p) => decodeURIComponent(String(p))).join('/');
+    const parts = (Array.isArray(segs) ? segs : [segs])
+      .flatMap((p) => String(p).split('/'))
+      .map((p) => p.trim())
+      .filter(Boolean);
+    return '/api/' + parts.map((p) => decodeURIComponent(p)).join('/');
+  }
+  if (req.query?.phone != null && String(req.url || '').includes('/chats/')) {
+    return `/api/chats/${decodeURIComponent(String(req.query.phone))}`;
   }
   try {
     return new URL(req.url || '/', 'http://localhost').pathname;

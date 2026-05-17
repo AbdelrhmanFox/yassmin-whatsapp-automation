@@ -95,6 +95,19 @@ function apiHeaders() {
   return { 'Content-Type': 'application/json' };
 }
 
+async function parseApiJson(res) {
+  const text = await res.text();
+  try {
+    return text ? JSON.parse(text) : {};
+  } catch {
+    const hint =
+      /the page could not be found/i.test(text) || text.trim().startsWith('<')
+        ? 'مسار API غير موجود على Vercel — أعيدي النشر بعد آخر تحديث (api/chats/[phone].js)'
+        : 'استجابة غير متوقعة من الخادم';
+    throw new Error(hint);
+  }
+}
+
 function showToast(message, type = 'ok') {
   toastEl.textContent = message;
   toastEl.className = `toast toast--${type}`;
@@ -453,7 +466,7 @@ async function fetchMessages() {
   const q = encodeURIComponent(msgSearchQInput.value.trim());
   const status = encodeURIComponent(msgFilterStatusInput.value);
   const res = await fetch(`/api/messages?q=${q}&status=${status}`, { headers: apiHeaders() });
-  const data = await res.json();
+  const data = await parseApiJson(res);
   if (!res.ok || !data.ok) {
     throw new Error(data.error || data.hint || 'فشل تحميل الرسائل');
   }
@@ -470,7 +483,7 @@ async function openMessageThread(phone) {
     const res = await fetch(`/api/messages-thread?phone=${encodeURIComponent(phone)}`, {
       headers: apiHeaders()
     });
-    const data = await res.json();
+    const data = await parseApiJson(res);
     if (!res.ok || !data.ok) {
       throw new Error(data.error || 'فشل تحميل المحادثة');
     }
@@ -582,7 +595,7 @@ async function onRoutingAction(btn) {
       headers: apiHeaders(),
       body: JSON.stringify({ mode, reason: 'dashboard_manual' })
     });
-    const data = await res.json();
+    const data = await parseApiJson(res);
     if (!res.ok || !data.ok) {
       throw new Error(data.error || 'فشل التحديث');
     }

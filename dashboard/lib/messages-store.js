@@ -18,7 +18,20 @@ async function edgeFetch(path, options = {}) {
   };
   const url = `${base}${path}`;
   const res = await fetch(url, { ...options, headers });
-  const data = await res.json().catch(() => ({}));
+  const raw = await res.text();
+  let data = {};
+  try {
+    data = raw ? JSON.parse(raw) : {};
+  } catch {
+    const snippet = raw.slice(0, 80).replace(/\s+/g, ' ');
+    const err = new Error(
+      snippet.startsWith('<') || /the page could not be found/i.test(raw)
+        ? 'edge_html_response — انشري yassmin-dashboard-api على Supabase أو راجعي SUPABASE_DASHBOARD_FUNCTION_URL'
+        : `edge_invalid_json: ${snippet}`
+    );
+    err.code = 'EDGE_PARSE';
+    throw err;
+  }
   if (!res.ok) {
     const err = new Error(data.error || `edge_${res.status}`);
     if (res.status === 404) err.code = 'NOT_FOUND';
@@ -229,10 +242,11 @@ async function setRoutingMode(phone, mode, options = {}) {
   }
 
   if (useMessagesEdge()) {
-    return edgeFetch(`/chats/${encodeURIComponent(p)}/routing`, {
+    await edgeFetch(`/chats/${encodeURIComponent(p)}/routing`, {
       method: 'PATCH',
       body: JSON.stringify({ mode, reason: options.reason || '' })
     });
+    return listThreads();
   }
 
   const supabase = await getDb();
